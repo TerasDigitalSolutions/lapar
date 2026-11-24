@@ -27,3 +27,7 @@ supabase/.env
 # python
 __pycache__/
 .venv/
+
+# agent worktrees
+.claude/
+.worktrees/

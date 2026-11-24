@@ -1,0 +1,76 @@
+# Decisions
+
+Newest first within each section. Each entry: what was decided, why, and where it lives. Implementers add entries here when the brief or docs leave something open (rule 6 of the brief: pick the simplest option, write it down, keep going).
+
+## 2026-11-25 — Owner decisions (Eshan; these override the brief)
+
+| # | Decision |
+| --- | --- |
+| O1 | **All Pro features are built for real**, each behind its feature key. Basic shops see them locked with a "Pro" badge; Pro shops (or per-shop overrides) get the real thing on Supabase. The demo still shows Basic and Pro. Order: Basic for real (M3), then Pro for real (M3b), then admin (M4, may overlap M3b), then the nightly job (M5). |
+| O2 | **Owner invites and password resets send no email** (Supabase Free mail only reaches the Supabase team). An Edge Function (secret key) creates the owner user and returns a one-time sign-in link (`auth.admin.generateLink`); the admin screen shows it with a Copy button and a WhatsApp share link. Same flow for resets. |
+| O3 | **Printing** is browser print with a 58 mm receipt stylesheet (works with Android Bluetooth printer apps via the system print dialog). No Web Bluetooth or ESC/POS in v1. |
+| O4 | **Export and backup (Pro), revised the same day:** CSV exports and the JSON full-shop export are real downloads under `export_backup`. The backup *destination* is an **open decision**: no Google Drive work now. A `BackupTarget` seam (`app/src/data/types.ts`, `lib/backup.ts`) lets a destination be added later. Stated intent: if Drive is ever used, each shop owner connects their **own** Drive, never a Teras or personal one. (This replaces the earlier "Drive via Google Identity Services, inert until a client ID is set".) |
+| O5 | The Supabase project exists: ref `lxcnmbcqdafhmhqimkgj`, region ap-southeast-1, Free plan. The app takes "a public client key" from config; server code takes "a secret key" from GitHub or Edge Function secrets, whichever kind (new `sb_publishable_`/`sb_secret_` or legacy JWT) exists. |
+| O6 | The repo is public: no secrets, pricing, partner or customer details, phone numbers or personal emails in it. |
+| O7 | The **"Ask Teras" WhatsApp number** is a platform setting in the database (`platform_settings`, single row), edited by platform admins in `#/admin`, read by owners through `get_shop_plan`. Never in config or the repo. Until set, the link is hidden and a neutral message shows. |
+| O8 | **No custom domain.** The site stays at `https://terasdigitalsolutions.github.io/lapar/` and QR codes encode that address. If a custom domain is added later, GitHub Pages redirects the github.io URL to it, so printed codes keep working. |
+
+## 2026-11-25 — Architecture decisions (planner)
+
+| # | Decision | Why | Where |
+| --- | --- | --- | --- |
+| D1 | The **whole database (Basic and Pro) is built in M2**; M3b wires the real app to the Pro RPCs. | One coherent schema and one `place_order`; the DB cards fill parallel slots while M1 runs, so the Basic real app is not delayed. | PLAN |
+| D2 | Every RPC is `security definer`, `set search_path = ''`, schema-qualified, with an explicit caller check on its first line. Default EXECUTE and table privileges are revoked from `public`, `anon`, `authenticated`; grants are explicit. `anon` may run exactly five customer RPCs. | Deny by default; one pattern to review; pgTAP asserts the allowlist. | DATA-MODEL 1, 7 |
+| D3 | The customer path calls PostgREST RPCs with plain `fetch`; supabase-js is loaded only by `import()` in `data/supabase/client.ts`. | Customer bundle stays small (< 2 s on 4G); staff/owner screens load supabase-js on demand. | ARCHITECTURE 3.2 |
+| D4 | **Swap:** `vite-plugin-pwa` (and `workbox-window`) replaced by a small Vite plugin plus a hand-written service worker. | The two-page build needs a demo-only precache list, and the same bundle-graph walk lets the build **fail** if supabase-js reaches the demo (or the customer route's static bundle). One plugin does both. | ARCHITECTURE 3.4, 7 |
+| D5 | RPC results use the camelCase field names of the DTOs in `types.ts`; arguments are `p_snake_case`; direct table rows are mapped in SupabaseData. | No renaming layer for RPCs; one contract file. | DATA-MODEL 1 |
+| D6 | Owner links are `#/welcome?token_hash=…&type=email\|recovery`, verified with `verifyOtp`; `detectSessionInUrl` is off. Links last 24 h (Auth email OTP expiry 86400 s, the maximum; setup step). | Implicit-flow tokens in the URL hash would collide with the hash router. | ARCHITECTURE 6 |
+| D7 | Edge Function `admin-owner-link` runs with `verify_jwt = false` and checks the caller itself (`auth.getUser` + `platform_admins`). Secret key from `SUPABASE_SECRET_KEYS.default`, falling back to `SUPABASE_SERVICE_ROLE_KEY`. | New keys are not JWTs; the platform's `verify_jwt` only understands legacy keys. | DATA-MODEL 6.7 |
+| D8 | GitHub secret **`SUPABASE_SECRET_KEY`** (`sb_secret_…`) replaces the brief's `SUPABASE_SERVICE_ROLE_KEY`. New keys go on the `apikey` header only. The publishable key comes from repo variable `SUPABASE_PUBLIC_KEY` at build time. | Legacy anon/service_role keys stop working at the end of 2026. | ARCHITECTURE 1, 13 |
+| D9 | PIN hashes live in `staff_pins` (no client grants) instead of a `staff.pin_hash` column; lockout state in `pin_attempts`. `claim_staff_session` returns `{ok:false}` on a wrong PIN instead of raising. | No role can read hashes, and `select *` on `staff` stays safe; raising would roll back the failure counter. | DATA-MODEL 3.2, 6.2 |
+| D10 | PIN lockout is per shop as the brief says: 5 consecutive wrong PINs lock the shop's PIN login for 10 minutes; a success resets the count. PINs are unique among a shop's active staff. | Brief rule. Accepted risk: anyone with the shop code can lock staff out for 10 minutes (see open items). Unique PINs identify the person. | DATA-MODEL 6.2, 6.4 |
+| D11 | Same-shop references are enforced by composite foreign keys `(shop_id, x_id) → x(shop_id, id)`. | RLS cannot stop an owner pointing a row at another shop's row; the FK can. | DATA-MODEL 1 |
+| D12 | Limits are triggers calling `within_limit()` when a table, station or staff member is added or reactivated. Counters do not count toward `max_tables`. After a downgrade, existing over-limit rows keep working; new ones are refused. | Brief: "a downgrade hides features; it never deletes data". | DATA-MODEL 4 |
+| D13 | Prep times come from `order_items.ready_at` / `served_at` (approval → ready), not an events table. | Smallest thing that measures it. | DATA-MODEL 3.4 |
+| D14 | **Sales** (Today and reports) = approved, not cancelled lines of orders created that MYT day (sets priced, components 0); bills = distinct tabs; average bill = sales ÷ bills rounded half up; cash rounding excluded. | One definition everywhere; independent of when tabs are paid. | DATA-MODEL 6.4 |
+| D15 | Every payment is a `tab_payments` row (Basic: one per tab). `tabs.paid_method` is dropped; `tabs.paid_total_sen` and `rounding_sen` are set on close. A tab cannot be paid while orders wait for approval. After an amount split, item splits are refused. | Bill split needs several payments; the rules prevent double charging. | DATA-MODEL 6.3 |
+| D16 | **Takeaway:** a counter QR is a `tables` row with `kind = 'counter'`; each counter order opens its own tab with a pickup number per shop per MYT day; pickup time only later the same day; counters allow 20 orders per 5 minutes (tables 5). The phone tracks its takeaway tab by tab id (random UUID). The pickup board uses `shops.pickup_board_token` and a fifth anon RPC, `get_pickup_board`, that returns numbers only. | Reuses tables and tabs; no personal data. | DATA-MODEL 6.1 |
+| D17 | Timed menus are availability windows on categories (from, to, days), not separate menu objects. | Breakfast/lunch maps onto categories; far less code. | DATA-MODEL 3.3 |
+| D18 | **Sets** are items with `is_combo` plus `combo_components`. Ordering one writes a priced set line and zero-priced component lines routed to their stations. Sets have no option groups (the note is copied to components). Cancelling a component keeps the set price (no refunds in v1). | Kitchen sees each part at its station; the bill shows one price. | DATA-MODEL 6.1.1 |
+| D19 | **Promos**: percent or amount off the list price of chosen items, on chosen days and a time window (may cross midnight); the lowest price wins; option prices are not discounted; each line stores its list price for the struck-through display. | Covers happy hour; priced only on the server. | DATA-MODEL 3.3, 6.1.1 |
+| D20 | **Custom columns** are per station and each maps to a core status; every core status keeps at least one column and statuses never go backwards along the board. Owners rename and add columns, not remove core steps. `advance_item` validates core moves; same-status moves are column changes only. | Brief: "renames or adds"; keeps the core-status logic intact. | DATA-MODEL 6.3, 6.5 |
+| D21 | **Auto pairings** are computed nightly by `pg_cron` (03:30 MYT) into `auto_pairings` (last 90 days, support ≥ 3 orders, top 3 by confidence) and refreshed when a shop gains the feature. `get_menu` lists manual pairings first, then auto. | Keeps `get_menu` fast; independent of GitHub. Fallback if `pg_cron` is unavailable: call it from the nightly workflow. | DATA-MODEL 10 |
+| D22 | Option price changes are ≥ 0 (no negative options). | Kopitiam options add cost; simpler checks. | DATA-MODEL 3.3 |
+| D23 | Shop logos stay in Supabase Storage (`menu-staging/{shop}/logo/`); the nightly job moves item photos only. | One small file per shop; the brief's job covers items. | DATA-MODEL 9 |
+| D24 | With `multi_station` off, every line goes to the shop's first active station, even if more stations exist after a downgrade. | Basic has one board. | DATA-MODEL 6.1.1 |
+| D25 | Customer status labels: pending → Waiting for approval, new → Received, preparing and cooking → Cooking, ready → Ready, served → Served. | The brief lists five customer states for four board columns. | `types.ts` |
+| D26 | A repeat tap on a server call reopens an acknowledged call (status back to open) so staff are alerted again. | The customer is still waiting. | DATA-MODEL 6.1 |
+| D27 | The demo regenerates its 30-day history on load, relative to today (not saved); only live demo state is saved. Clock presets (Real, Breakfast 08:30, Lunch 12:30, Afternoon 15:30) show timed menus and happy hour at any hour of a pitch. | Reports never go stale; deterministic; small localStorage. | ARCHITECTURE 3.1 |
+| D28 | The demo does **not** show "Google Drive backup connected" (brief's Pro table); it shows the same downloads as the real app. | Follows O4: the destination is undecided, so the demo must not promise one. | M1-L |
+| D29 | pgTAP tests use the seed as fixtures, with ids derived as `md5('<kind>:<shop>:<slug>')::uuid`. The seed adds a second shop, "Restoran Contoh" (Pro), beside the brief's "Kopitiam Teras" (Basic). The seed runs only locally and in CI. | Deterministic fixtures without id bookkeeping; Pro paths testable locally. | DATA-MODEL 11 |
+| D30 | Supabase CLI is pinned to 2.120.0 in CI (the version on Eshan's Mac); bump both together. | Same behaviour locally and in CI. | PLAN M2-A |
+| D31 | Exports are RPCs `export_shop_meta` and `export_orders` (≤ 93 days per call), gated on the server; files are built in the browser and are not limited by the report window. Printing is UI-only (no extra data leaves the database). | Real gate for the data; backups must be complete. | DATA-MODEL 6.5 |
+| D32 | `report_history_days` = N means the earliest visible day is MYT today − (N − 1). | "Last 30 days" includes today. | DATA-MODEL 5 |
+| D33 | `place_order` accepts 1–30 lines, quantity 1–99, notes ≤ 140 characters. | Brief limits plus sane bounds. | DATA-MODEL 6.1.1 |
+| D34 | Owners can open the staff screens without a PIN. | They already have full rights; one less step at opening time. | ARCHITECTURE 5 |
+| D35 | Realtime is only a reload signal: screens reload by RPC (debounced) on a change, on reconnect, when visible and when back online. `record_payment` touches `tabs.updated_at` so partial payments reach other devices; `tab_payments` stays out of the publication. | Never trust missed or partial events (brief). | ARCHITECTURE 8 |
+| D36 | `get_menu` returns the shop's full feature map to customers. | Not secret; saves a call. | DATA-MODEL 6.1 |
+| D37 | `order_items.line_no` orders lines within an order (for "2 of 4"). | All lines share one `created_at`. | DATA-MODEL 3.4 |
+| D38 | One Supabase session per browser: an owner signing in on a staff device replaces its anonymous staff session (the form warns). | Supabase stores one session per origin. | ARCHITECTURE 6 |
+| D39 | Draft Bahasa Malaysia and Chinese strings ship only for the customer and pickup screens (the Pro language switch), marked `// draft: needs native review`. | Pro needs a working switch now; English elsewhere at launch. | ARCHITECTURE 10 |
+| D40 | `order_status = 'cancelled'` is reserved and unused in v1; staff cancel lines. | Brief enum kept; no flow needs it. | `types.ts` |
+| D41 | The first platform admin is created by one SQL insert during setup; everything after that goes through `#/admin`. | Bootstrapping needs one privileged step. | ARCHITECTURE 13 |
+| D42 | Staging bucket: public, 2 MB per file, WebP and JPEG only. | Browser already resizes to ≤ 1200 px. | DATA-MODEL 9 |
+| D43 | Brief column renames/additions: `orders.approved_by` → `approved_by_staff_id` (null when an owner approves or the order needs no approval); new columns for Pro (`tables.kind`, `tabs.kind/pickup_no/pickup_at`, `items.is_combo`, `translations`, category windows, `order_items.kind/line_no/parent_line_id/list_price_sen/promo_id/column_id/ready_at/served_at/paid_payment_id`). | Staff approve from anonymous device users, so the staff id is the useful record. | DATA-MODEL 3 |
+
+## Open — needs Eshan
+
+| # | Question |
+| --- | --- |
+| Q1 | Backup destination for shop backups (O4). Today: download to the device only. |
+| ~~Q2~~ | Resolved 2026-11-25: the hosted project runs Postgres 17.12, so `major_version = 17` is right. |
+| ~~Q3~~ | Resolved 2026-11-25: the project already has a default publishable key and a default secret key; nothing to create. |
+| Q4 | One-time setup in ARCHITECTURE section 13: anonymous sign-ins on, OTP expiry 24 h, GitHub secrets and variable, private `lapar-backups` repo and `age` key, first admin user, Pages source, branch protection that lets the Actions bot push. |
+| Q5 | Who reviews the Bahasa Malaysia and Chinese drafts (customer screens and seed menu translations), and when. |
+| Q6 | Demo photos: initials placeholders until real or licensed photos are supplied. |
+| Q7 | Per-shop PIN lockout lets anyone who knows the shop code lock staff out for 10 minutes. Keep (brief rule), or lock per device instead? |
