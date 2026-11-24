@@ -1,0 +1,29 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# env and secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.age
+*.sql.gz
+
+# tooling output
+playwright-report/
+test-results/
+.vite/
+*.tsbuildinfo
+
+# supabase local state
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# python
+__pycache__/
+.venv/
