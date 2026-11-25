@@ -10,7 +10,7 @@ Read with `docs/DATA-MODEL.md` (database), `docs/PLAN.md` (who builds what) and 
 | Demo page `/lapar/demo/` | GitHub Pages, offline via its own service worker | Nothing (no network calls, no supabase-js) |
 | Supabase (project `lxcnmbcqdafhmhqimkgj`, Singapore, Free) | Postgres + RLS + RPCs, Auth, Realtime, Storage, pg_cron, one Edge Function | — |
 | Edge Function `admin-owner-link` | Supabase | Auth admin API with the secret key |
-| GitHub Actions | `ci.yml`, `deploy.yml`, `supabase-deploy.yml`, `nightly.yml` | Pages, Supabase (secret key, DB URL), private repo `lapar-backups` |
+| GitHub Actions | `ci.yml`, `deploy.yml` (incl. the Supabase deploy job), `nightly.yml` | Pages, Supabase (secret key, DB URL), private repo `lapar-backups` |
 
 Keys: the browser gets a **public client key** (`sb_publishable_…`; a legacy anon JWT also works) from `VITE_SUPABASE_PUBLIC_KEY` at build time. Server code gets a **secret key** (`sb_secret_…`, or the legacy service_role JWT) only from GitHub secrets or the Edge Function environment. New keys go on the `apikey` header only, never `Authorization: Bearer` (they are not JWTs). Legacy keys stop working at the end of 2026, so set up the new ones.
 
@@ -191,7 +191,7 @@ M0's layer: each feature has `messages.ts` → `defineMessages('<namespace>', { 
 | --- | --- | --- |
 | `ci.yml` | M0 (`web`: its `npm run e2e` already runs `e2e/demo/*`); jobs added by M2-A (`db`), M3-A (`e2e-local`), M5-B (`python`) | typecheck, lint, unit, build (with bundle guard), Playwright demo; `supabase start` + `supabase test db`; local-Supabase Playwright; Python unit tests |
 | `deploy.yml` | M0; M3-A adds `VITE_SUPABASE_PUBLIC_KEY: ${{ vars.SUPABASE_PUBLIC_KEY }}`; M5-B adds `inputs.ref` | On `main` after CI: build, deploy Pages. Reusable (`workflow_call`) for the nightly job. |
-| `supabase-deploy.yml` | M3-D | After CI on `main` when `supabase/**` changed, or by hand: `supabase db push --db-url "$SUPABASE_DB_URL"` and `supabase functions deploy admin-owner-link --project-ref lxcnmbcqdafhmhqimkgj`. Never pushes the seed. |
+| `deploy.yml` → `supabase` job | review fix (replaces M3-D's `supabase-deploy.yml`) | Runs only on `push` to `main`, by hand or when called by `nightly.yml`, after CI and before the Pages build: `supabase db push --db-url "$SUPABASE_DB_URL"` and `supabase functions deploy admin-owner-link --project-ref lxcnmbcqdafhmhqimkgj --use-api`. Skips with a notice until both secrets exist. Never pushes the seed. (A `workflow_run` trigger was dropped: it also fires for fork PRs from a branch named `main`.) |
 | `nightly.yml` | M5-B | 19:15 UTC (03:15 MYT) + manual: photo sync, deploy only if changed, mark published, delete staging, encrypted backup, heartbeat. |
 
 **One-time setup (Eshan, not code):**

@@ -49,11 +49,20 @@ Deno.serve(async (req) => {
     const { data: shop } = await admin.from('shops').select('id').eq('id', shopId).maybeSingle();
     if (!shop) return send(404, { error: 'not_found', detail: 'shop' });
 
+    // An existing account is only adopted when it already belongs to an owner (for reset: of this shop).
+    // Otherwise a stranger could pre-register the future owner's email and become owner on invite.
+    const ownsAnyShop = async (userId: string) => {
+      const { data } = await admin.from('shop_owners').select('shop_id').eq('user_id', userId).limit(1);
+      return !!data?.length;
+    };
+    const emailInUse = () => send(409, { error: 'invalid_input', detail: 'email_in_use' });
+
     if (mode === 'invite') {
       const { error } = await admin.auth.admin.createUser({ email, email_confirm: true });
       if (error && error.code !== 'email_exists') return send(500, { error: 'internal' });
       const { data, error: linkErr } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
       if (linkErr || !data.user) return send(500, { error: 'internal' });
+      if (error && !(await ownsAnyShop(data.user.id))) return emailInUse();
       const { error: ownErr } = await admin
         .from('shop_owners').upsert({ shop_id: shopId, user_id: data.user.id }, { onConflict: 'shop_id,user_id' });
       if (ownErr) return send(500, { error: 'internal' });

@@ -13,11 +13,15 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import warnings
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
 MAX_PX = 800
+MAX_BYTES = 5 * 1024 * 1024  # download cap
+MAX_PIXELS = 25_000_000  # decompression-bomb guard; Pillow raises at twice this
+PAGE = 500  # below PostgREST's 1000-row cap
 BUCKET = "menu-staging"
 MENU_DIR = Path("app/public/menu")
 
@@ -35,14 +39,20 @@ def urllib_http(method, url, headers=None, body=None):
     req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
-            return r.status, r.read()
+            data = r.read(MAX_BYTES + 1)
+            if len(data) > MAX_BYTES:
+                raise ValueError(f"response over {MAX_BYTES} bytes")
+            return r.status, data
     except urllib.error.HTTPError as e:
         return e.code, e.read()
 
 
 def encode_webp(data):
     """Aspect-preserving resize to at most MAX_PX on the long edge, WebP quality 80."""
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+    Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
     img.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGBA" if "transparency" in img.info else "RGB")
@@ -62,6 +72,16 @@ def object_path(staging_url):
     if marker not in path:
         return None
     return urllib.parse.unquote(path.split(marker, 1)[1]) or None
+
+
+def allowed_staging_url(base, shop_id, item_id, url):
+    """True only for this row's own folder in the public staging bucket of our project."""
+    if not isinstance(url, str):
+        return False
+    prefix = f"{base.rstrip('/')}/storage/v1/object/public/{BUCKET}/{shop_id}/{item_id}/"
+    rest = url[len(prefix):].split("?", 1)[0].split("#", 1)[0]
+    segs = urllib.parse.unquote(rest).replace("\\", "/").split("/")
+    return url.startswith(prefix) and bool(rest) and not any(x in ("..", ".") for x in segs)
 
 
 def find_orphans(menu_dir, referenced, written):
@@ -89,34 +109,57 @@ class Api:
             raise RuntimeError(f"{method} {path.split('?')[0]} -> HTTP {status}")
         return resp
 
+    def list_all(self, path):
+        """Every row of a listing, paged until an empty page. Raises if any page fails."""
+        rows, sep = [], "&" if "?" in path else "?"
+        for page in range(100_000):
+            got = json.loads(self.call(
+                "GET", f"{path}{sep}order=id&limit={PAGE}&offset={page * PAGE}"))
+            if not got:
+                return rows
+            rows += got
+        raise RuntimeError(f"GET {path.split('?')[0]} -> listing never ended")
+
 
 def prepare(api, root, manifest_path, dry_run=False):
-    rows = json.loads(api.call(
-        "GET", "/rest/v1/items?select=id,shop_id,photo_url,photo_state&photo_url=not.is.null"))
+    """Returns (manifest, failures). Failed rows are skipped, never marked published."""
+    # A failed or partial listing raises here, before anything is deleted.
+    rows = api.list_all("/rest/v1/items?select=id,shop_id,photo_url,photo_state&photo_url=not.is.null")
     staging = [r for r in rows if r["photo_state"] == "staging"]
     referenced = {r["photo_url"] for r in rows if r["photo_state"] == "published"}
-    manifest, written = [], set()
+    manifest, written, failures = [], set(), []
     for r in staging:
-        status, data = api.http("GET", r["photo_url"], {}, None)
-        if status != 200:
-            raise RuntimeError(f"download {r['id']} -> HTTP {status}")
-        webp = encode_webp(data)
-        rel = new_rel_path(r["shop_id"], r["id"], webp)
-        print(f"{'would write' if dry_run else 'write'} {rel}")
-        if not dry_run:
-            dest = root / "app/public" / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(webp)
+        try:
+            if not allowed_staging_url(api.url, r["shop_id"], r["id"], r["photo_url"]):
+                print(f"skip {r['id']}: photo_url is not in its own staging folder", file=sys.stderr)
+                continue
+            status, data = api.http("GET", r["photo_url"], {}, None)
+            if status != 200:
+                raise RuntimeError(f"download -> HTTP {status}")
+            if len(data) > MAX_BYTES:
+                raise ValueError(f"download over {MAX_BYTES} bytes")
+            webp = encode_webp(data)
+            rel = new_rel_path(r["shop_id"], r["id"], webp)
+            print(f"{'would write' if dry_run else 'write'} {rel}")
+            if not dry_run:
+                dest = root / "app/public" / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(webp)
+        except Exception as e:  # one bad row must not stop the others
+            print(f"error: item {r.get('id')}: {type(e).__name__}: {e}", file=sys.stderr)
+            failures.append(r.get("id"))
+            continue
         written.add(rel)
         manifest.append({"item_id": r["id"], "staging_url": r["photo_url"], "new_path": rel,
                          "object_path": object_path(r["photo_url"])})
-    for p in find_orphans(root / MENU_DIR, referenced, written):
-        print(f"{'would delete' if dry_run else 'delete'} orphan {p.relative_to(root)}")
-        if not dry_run:
-            p.unlink()
+    if rows:  # an empty listing with files on disk is more likely a fault than an empty menu
+        for p in find_orphans(root / MENU_DIR, referenced, written):
+            print(f"{'would delete' if dry_run else 'delete'} orphan {p.relative_to(root)}")
+            if not dry_run:
+                p.unlink()
     if not dry_run:
         Path(manifest_path).write_text(json.dumps(manifest, indent=2))
-    return manifest
+    return manifest, failures
 
 
 def publish(api, manifest, site_base, dry_run=False, sleep=time.sleep, tries=10, wait=30):
@@ -162,7 +205,10 @@ def main(argv=None, http=urllib_http, sleep=time.sleep, root=Path(".")):
     try:
         api = Api(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"], http)
         if a.cmd == "prepare":
-            prepare(api, root, a.manifest, a.dry_run)
+            _, failures = prepare(api, root, a.manifest, a.dry_run)
+            if failures:
+                print(f"error: {len(failures)} row(s) failed: {failures}", file=sys.stderr)
+                return 1
         else:
             publish(api, json.loads(Path(a.manifest).read_text()), a.site_base, a.dry_run, sleep)
     except Exception as e:  # message holds only method, path and status: never the key

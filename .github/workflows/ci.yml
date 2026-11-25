@@ -9,6 +9,9 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
   web:
     runs-on: ubuntu-latest
@@ -34,7 +37,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref || github.sha }}
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.120.0
       # pgTAP needs the database plus auth and storage schemas (gotrue, storage-api)
@@ -52,7 +55,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.120.0
       # edge-runtime stays on: the admin spec calls the admin-owner-link function, which start serves

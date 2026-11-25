@@ -60,5 +60,8 @@ Repo size: removed photos stay in history. At about 80 KB per photo that is fine
 2. Decrypt and unpack with the private age key: `age -d -i key.txt lapar-YYYY-MM-DD.tar.gz.age | tar xz` (creates `dump/roles.sql`, `schema.sql`, `data.sql`).
 3. Create a fresh Supabase project with the same Postgres major version as `supabase/config.toml`, and take its database URL as `$DB`.
 4. Load in order: `psql "$DB" -f dump/roles.sql`, then `dump/schema.sql`, then `dump/data.sql`. Errors about objects that already exist in Supabase's own schemas are expected.
-5. Point the repo secrets and the `SUPABASE_PUBLIC_KEY` variable at the new project, update the project ref in `supabase-deploy.yml`, and re-run `supabase-deploy` so migrations and the edge function match. The dump covers the app's own schemas, not Supabase auth users: recreate your admin user (`docs/ARCHITECTURE.md`, section 13) and re-invite owners from `#/admin`.
-6. Menu photos live in the site repo (`app/public/menu/`), not in the backup; photos still in staging are not backed up.
+5. Mark every migration as already applied. The dump has the schema but not the `supabase_migrations` history table, so without this a deploy re-runs every migration and fails. Run `supabase migration repair --status applied <version> ...` with the version of every file in `supabase/migrations/` (the number before the first `_`), e.g. `supabase migration repair --db-url "$DB" --status applied $(ls supabase/migrations | cut -d_ -f1)`, then check with `supabase migration list --db-url "$DB"`.
+6. Point the repo secrets and the `SUPABASE_PUBLIC_KEY` variable at the new project, update the project ref in the `supabase` job of `deploy.yml`, and re-run `Deploy` so the Edge Function matches. The dump includes the `auth.*` tables, so users and owner logins come back with the data; check that you can sign in as admin (`docs/ARCHITECTURE.md`, section 13).
+7. Menu photos live in the site repo (`app/public/menu/`), not in the backup; photos still in staging are not backed up.
+
+Rehearse this restore once into a scratch Supabase project before you ever need it, and delete the scratch project afterwards.

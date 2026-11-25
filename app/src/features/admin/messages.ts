@@ -10,7 +10,7 @@ type Key =
   | 'overrides' | 'overrides_hint' | 'plan_value' | 'override_value' | 'override' | 'edit' | 'remove' | 'on' | 'off' | 'unlimited' | 'none'
   | 'note' | 'note_hint' | 'note_required' | 'limit_value' | 'limit_hint' | 'limit_invalid' | 'save' | 'cancel' | 'changed_by' | 'override_saved' | 'override_removed' | 'override_title'
   | 'settings' | 'whatsapp' | 'whatsapp_hint' | 'whatsapp_saved'
-  | 'err_slug_taken' | 'err_forbidden' | 'err_not_signed_in' | 'err_not_found' | 'err_invalid_input' | 'err_network' | 'err_unknown';
+  | 'err_email_in_use' | 'err_slug_taken' | 'err_forbidden' | 'err_not_signed_in' | 'err_not_found' | 'err_invalid_input' | 'err_network' | 'err_unknown';
 
 export const useAdminT = defineMessages<Key>('admin', {
   en: {
@@ -39,6 +39,7 @@ export const useAdminT = defineMessages<Key>('admin', {
     settings: 'Platform settings', whatsapp: 'Ask Teras WhatsApp number',
     whatsapp_hint: 'Digits with country code, no plus sign. Owners see an "Ask Teras" link to this number. Leave empty to hide it.',
     whatsapp_saved: 'WhatsApp number saved',
+    err_email_in_use: 'That email already has an account that is not a shop owner. Remove it in Supabase Auth, or use another email.',
     err_slug_taken: 'That shop code is already used. Pick another.', err_forbidden: 'This account is not allowed to do that.',
     err_not_signed_in: 'Your session ended. Sign in again.', err_not_found: 'We could not find that. Refresh and try again.',
     err_invalid_input: 'Something in that is not valid. Check it and try again.', err_network: 'No connection. Try again.', err_unknown: 'Something went wrong. Try again.',

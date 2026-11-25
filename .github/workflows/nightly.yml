@@ -21,6 +21,8 @@ jobs:
       contents: write
     outputs:
       changed: ${{ steps.commit.outputs.changed || 'false' }}
+      has_manifest: ${{ steps.commit.outputs.has_manifest || 'false' }}
+      prep_failed: ${{ steps.prepare.outputs.failed || 'false' }}
       sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
@@ -42,15 +44,22 @@ jobs:
           python-version: '3.12'
       - if: steps.gate.outputs.run == 'true'
         run: pip install -r scripts/requirements.txt
-      - if: steps.gate.outputs.run == 'true'
+      # Rows that failed are logged and skipped by the script; the good ones still ship and the job fails at the end.
+      - id: prepare
+        if: steps.gate.outputs.run == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python scripts/photo_sync.py prepare
+        run: python scripts/photo_sync.py prepare || echo "failed=true" >> "$GITHUB_OUTPUT"
       - id: commit
         if: steps.gate.outputs.run == 'true'
         run: |
           git add -A app/public/menu
+          # Rows can sit in staging after a failed deploy or publish even when the files are unchanged.
+          if [ -s photo-manifest.json ] && [ "$(jq length photo-manifest.json)" -gt 0 ]; then
+            echo "has_manifest=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if git diff --cached --quiet; then
             echo "No photo changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -60,7 +69,7 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.commit.outputs.changed == 'true'
+      - if: steps.commit.outputs.has_manifest == 'true'
         uses: actions/upload-artifact@v5
         with:
           name: photo-manifest
@@ -74,12 +83,13 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/deploy.yml
+    secrets: inherit
     with:
       ref: ${{ needs.sync.outputs.sha }}
 
   publish:
     needs: [sync, deploy]
-    if: needs.sync.outputs.changed == 'true'
+    if: ${{ !cancelled() && needs.sync.outputs.has_manifest == 'true' && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -121,7 +131,7 @@ jobs:
             echo "::notice::Backup skipped: secrets SUPABASE_DB_URL, AGE_PUBLIC_KEY and BACKUP_REPO_TOKEN are not all set."
           fi
       - if: steps.gate.outputs.run == 'true'
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.120.0
       - if: steps.gate.outputs.run == 'true'
@@ -140,6 +150,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - if: needs.sync.outputs.prep_failed == 'true'
+        run: |
+          echo "::error::photo_sync prepare skipped one or more rows; see the sync job log."
+          exit 1
       - uses: actions/checkout@v5
         with:
           ref: main

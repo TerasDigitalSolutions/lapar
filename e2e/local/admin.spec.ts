@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
 // Needs a freshly seeded database (`supabase db reset`) and the owner RPCs (owner landing page, Plan page).
@@ -50,4 +51,28 @@ test('admin sets up a shop, invites its owner, changes plan, override and WhatsA
   await owner.getByRole('button', { name: 'Plan' }).click();
   await expect(owner.getByRole('link', { name: 'Ask Teras on WhatsApp' })).toHaveAttribute('href', 'https://wa.me/60123456789');
   await ctx.close();
+});
+
+// A stranger pre-registers the future owner's email; the invite must be refused, not adopt that account.
+test('admin cannot invite an email that already has a non-owner account', async ({ page, request }) => {
+  const env = Object.fromEntries(
+    execSync('supabase status -o env', { encoding: 'utf8' }).split('\n').map((l) => /^([A-Z_]+)="?(.*?)"?$/.exec(l)).filter((m): m is RegExpExecArray => !!m).map((m) => [m[1], m[2]]),
+  );
+  const api = env.API_URL;
+  const anon = env.PUBLISHABLE_KEY ?? env.ANON_KEY;
+  const signup = await request.post(`${api}/auth/v1/signup`, {
+    headers: { apikey: anon },
+    data: { email: 'stranger@lapar.test', password: 'stranger-local-only' },
+  });
+  expect(signup.ok()).toBeTruthy();
+
+  await page.goto('/lapar/#/admin');
+  await page.getByLabel('Email').fill('admin@lapar.test');
+  await page.getByLabel('Password').fill('lapar-local-only');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Shop name').fill('Warung Rampas');
+  await page.getByLabel('Owner email').fill('stranger@lapar.test');
+  await page.getByRole('button', { name: 'Create shop and owner link' }).click();
+  await expect(page.getByText(/already has an account that is not a shop owner/)).toBeVisible();
+  await expect(page.getByText(/This link works once/)).toHaveCount(0);
 });

@@ -15,7 +15,8 @@ type T = ReturnType<typeof useAdminT>;
 const ERR_KEYS = ['slug_taken', 'forbidden', 'not_signed_in', 'not_found', 'invalid_input', 'network'] as const;
 /** Readable text for any thrown value, never the raw code. */
 function errText(t: T, e: unknown): string {
-  const code = toLaparError(e).code;
+  const { code, detail } = toLaparError(e);
+  if (detail === 'email_in_use') return t('err_email_in_use');
   return (ERR_KEYS as readonly string[]).includes(code) ? t(`err_${code as (typeof ERR_KEYS)[number]}`) : t('err_unknown');
 }
 
@@ -50,7 +51,7 @@ export function LinkPanel({ link }: { link: OwnerLinkDTO }) {
   );
 }
 
-function CreateShop({ onCreated }: { onCreated: (id: string, link: OwnerLinkDTO | null, linkFailed: boolean) => void }) {
+function CreateShop({ onCreated }: { onCreated: (id: string, link: OwnerLinkDTO | null, linkError: string | null) => void }) {
   const t = useAdminT();
   const { admin } = useData();
   const [name, setName] = useState('');
@@ -79,17 +80,19 @@ function CreateShop({ onCreated }: { onCreated: (id: string, link: OwnerLinkDTO 
       return;
     }
     let link: OwnerLinkDTO | null = null;
+    let linkError: string | null = null;
     try {
       link = await admin.createOwnerLink(id, email.trim(), 'invite');
-    } catch {
-      /* shown by the caller as a warning; the shop exists */
+    } catch (err) {
+      // the shop exists; the caller shows this as a warning
+      linkError = toLaparError(err).detail === 'email_in_use' ? t('err_email_in_use') : t('shop_created_link_failed');
     }
     setBusy(false);
     setName('');
     setSlug('');
     setSlugTouched(false);
     setEmail('');
-    onCreated(id, link, link === null);
+    onCreated(id, link, linkError);
   }
 
   return (
@@ -192,7 +195,7 @@ function OverrideEditor({ shop, keyName, current, onClose, onSaved }: { shop: Ad
   );
 }
 
-function ShopDetail({ shop, link, warn, onLink, onChanged, onBack }: { shop: AdminShopDTO; warn: boolean; link: OwnerLinkDTO | null; onLink: (l: OwnerLinkDTO | null) => void; onChanged: () => void; onBack: () => void }) {
+function ShopDetail({ shop, link, warn, onLink, onChanged, onBack }: { shop: AdminShopDTO; warn: string | null; link: OwnerLinkDTO | null; onLink: (l: OwnerLinkDTO | null) => void; onChanged: () => void; onBack: () => void }) {
   const t = useAdminT();
   const { admin } = useData();
   const toast = useToast();
@@ -246,7 +249,7 @@ function ShopDetail({ shop, link, warn, onLink, onChanged, onBack }: { shop: Adm
           {!shop.active && ` · ${t('inactive')}`}
         </p>
       </header>
-      {warn && <Banner kind="warn">{t('shop_created_link_failed')}</Banner>}
+      {warn && <Banner kind="warn">{warn}</Banner>}
       {error && <Banner kind="error">{error}</Banner>}
       {link && <LinkPanel link={link} />}
 
@@ -383,7 +386,7 @@ function AdminScreen() {
   const [error, setError] = useState<LaparError | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [link, setLink] = useState<OwnerLinkDTO | null>(null);
-  const [warn, setWarn] = useState(false);
+  const [warn, setWarn] = useState<string | null>(null);
 
   const load = useCallback(() => {
     admin.listShops().then((s) => (setShops(s), setError(null)), (e: unknown) => setError(toLaparError(e)));
@@ -395,7 +398,7 @@ function AdminScreen() {
   const shop = shops.find((s) => s.id === selected);
 
   if (shop)
-    return <ShopDetail key={shop.id} shop={shop} warn={warn} link={link} onLink={setLink} onChanged={load} onBack={() => (setSelected(null), setLink(null), setWarn(false))} />;
+    return <ShopDetail key={shop.id} shop={shop} warn={warn} link={link} onLink={setLink} onChanged={load} onBack={() => (setSelected(null), setLink(null), setWarn(null))} />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -425,9 +428,9 @@ function AdminScreen() {
         </ul>
       </section>
       <CreateShop
-        onCreated={(id, l, failed) => {
+        onCreated={(id, l, linkError) => {
           setLink(l);
-          setWarn(failed);
+          setWarn(linkError);
           setSelected(id);
           load();
         }}

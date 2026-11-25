@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 
 from PIL import Image
@@ -23,16 +24,21 @@ def png(w, h):
 
 class Fake:
     """Fake HTTP layer: records calls, answers from handlers."""
-    def __init__(self, rows, site_status=(200,), patch_rows=None):
+    def __init__(self, rows, site_status=(200,), patch_rows=None, cap=None, fail_offset=None, blobs=None):
         self.rows, self.site = rows, list(site_status)
         self.patch_rows, self.calls = patch_rows, []
+        self.cap, self.fail_offset, self.blobs = cap, fail_offset, blobs or {}
 
     def __call__(self, method, url, headers=None, body=None):
         self.calls.append((method, url, headers, body))
         if method == "GET" and "/rest/v1/items" in url:
-            return 200, json.dumps(self.rows).encode()
+            q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+            off, lim = int(q.get("offset", 0)), int(q.get("limit", 1000))
+            if off == self.fail_offset:
+                return 500, b""
+            return 200, json.dumps(self.rows[off:off + min(lim, self.cap or lim)]).encode()
         if method == "GET" and "/storage/" in url:
-            return 200, png(1600, 900)
+            return 200, self.blobs.get(url, png(1600, 900))
         if method == "GET":  # site probe
             return (self.site.pop(0) if len(self.site) > 1 else self.site[0]), b""
         if method == "PATCH":
@@ -158,6 +164,82 @@ class EndToEnd(unittest.TestCase):
         self.run_main("prepare", http)
         self.assertEqual(self.run_main("publish", http, "--site-base", "https://site"), 1)
         self.assertFalse(any(c[0] == "DELETE" for c in http.calls))
+
+    def staging_row(self, i, url=None):
+        u = f"{BASE}/storage/v1/object/public/menu-staging/{SHOP}/{i}/a.png"
+        return {"id": i, "shop_id": SHOP, "photo_url": url or u, "photo_state": "staging"}
+
+    def published_rows(self, n):
+        return [{"id": f"p{i}", "shop_id": SHOP, "photo_url": f"menu/s1/p{i}.webp",
+                 "photo_state": "published"} for i in range(n)]
+
+    def test_pagination_collects_every_row_despite_server_cap(self):
+        rows = self.published_rows(1234)
+        got = ps.Api(BASE, "sb_secret_x", Fake(rows, cap=1000)).list_all("/rest/v1/items?select=id")
+        self.assertEqual(len(got), 1234)
+
+    def test_orphan_deletion_keeps_published_rows_beyond_first_page(self):
+        n = ps.PAGE + 10
+        menu = self.root / "app/public/menu/s1"
+        rows = self.published_rows(n)
+        for r in rows:
+            (self.root / "app/public" / r["photo_url"]).write_bytes(b"x")
+        self.assertEqual(self.run_main("prepare", Fake(rows, cap=ps.PAGE)), 0)
+        self.assertTrue((menu / f"p{n - 1}.webp").exists())
+        self.assertFalse((menu / "old.webp").exists())  # genuine orphan still goes
+
+    def test_incomplete_listing_deletes_nothing(self):
+        rows = self.published_rows(ps.PAGE + 5)
+        self.assertEqual(self.run_main("prepare", Fake(rows, fail_offset=ps.PAGE)), 1)
+        self.assertTrue((self.root / "app/public/menu/s1/old.webp").exists())
+        self.assertFalse(Path(self.manifest).exists())
+
+    def test_empty_listing_deletes_nothing(self):
+        self.assertEqual(self.run_main("prepare", Fake([])), 0)
+        self.assertTrue((self.root / "app/public/menu/s1/old.webp").exists())
+
+    def test_url_allowlist(self):
+        def ok(u, shop=SHOP, item=ITEM):
+            return ps.allowed_staging_url(BASE, shop, item, u)
+        self.assertTrue(ok(STAGING))
+        self.assertFalse(ok("http://169.254.169.254/latest/meta-data"))
+        self.assertFalse(ok("https://evil.example/storage/v1/object/public/menu-staging/s1/i1/a.png"))
+        self.assertFalse(ok(STAGING, shop="s2"))  # someone else's shop
+        self.assertFalse(ok(STAGING, item="i2"))  # someone else's item
+        self.assertFalse(ok(f"{BASE}/storage/v1/object/public/menu-staging/s1/i1/../i2/a.png"))
+        self.assertFalse(ok(f"{BASE}/storage/v1/object/public/menu-staging/s1/i1/%2e%2e/i2/a.png"))
+        self.assertFalse(ok(f"{BASE}.evil.com/storage/v1/object/public/menu-staging/s1/i1/a.png"))
+        self.assertFalse(ok(f"{BASE}/storage/v1/object/public/menu/s1/i1/a.png"))
+        self.assertFalse(ok(None))
+
+    def test_disallowed_url_is_not_fetched(self):
+        http = Fake([self.staging_row("i1", "http://169.254.169.254/x")])
+        self.assertEqual(self.run_main("prepare", http), 0)
+        self.assertFalse(any("169.254" in c[1] for c in http.calls))
+        self.assertEqual(json.loads(Path(self.manifest).read_text()), [])
+
+    def test_one_bad_row_does_not_stop_the_rest(self):
+        bad, good = self.staging_row("bad"), self.staging_row("good")
+        http = Fake([bad, good], blobs={bad["photo_url"]: b"<html>not an image</html>"})
+        self.assertEqual(self.run_main("prepare", http), 1)
+        m = json.loads(Path(self.manifest).read_text())
+        self.assertEqual([x["item_id"] for x in m], ["good"])
+        self.assertEqual(http.writes(), [])  # nothing marked published
+
+    def test_oversize_download_is_a_row_failure(self):
+        row = self.staging_row("big")
+        http = Fake([row], blobs={row["photo_url"]: b"x" * (ps.MAX_BYTES + 1)})
+        self.assertEqual(self.run_main("prepare", http), 1)
+        self.assertEqual(json.loads(Path(self.manifest).read_text()), [])
+
+    def test_pixel_cap_rejects_decompression_bomb(self):
+        old = ps.MAX_PIXELS
+        ps.MAX_PIXELS = 1000
+        try:
+            with self.assertRaises(Exception):
+                ps.encode_webp(png(200, 200))
+        finally:
+            ps.MAX_PIXELS = old
 
 
 if __name__ == "__main__":
