@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, expect, test } from 'vitest';
 import { createDemoData } from '../../data/demo';
 import { DataProvider } from '../../data/context';
+import { EntitlementsProvider } from '../../entitlements/hooks';
+import { PLAN_DEFAULTS } from '../../entitlements/keys';
 import { KitchenView } from './KitchenView';
 
 afterEach(cleanup);
@@ -13,7 +15,9 @@ test('tap a card through to Ready, then back and cancel', async () => {
   await d.staff.approveOrder(placed.orderId);
   render(
     <DataProvider value={d}>
-      <KitchenView shopId={SHOP} />
+      <EntitlementsProvider value={PLAN_DEFAULTS.basic}>
+        <KitchenView shopId={SHOP} />
+      </EntitlementsProvider>
     </DataProvider>,
   );
   const inColumn = (name: string) => screen.getByRole('region', { name }).textContent;

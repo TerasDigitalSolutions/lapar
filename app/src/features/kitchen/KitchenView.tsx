@@ -1,12 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useData } from '../../data/context';
-import { toLaparError, useLiveQuery, useOnline, usePageVisible, usePolling } from '../../data/hooks';
+import { useLiveQuery, useOnline, usePageVisible, usePolling } from '../../data/hooks';
 import type { BoardColumnDTO, BoardLineDTO } from '../../data/types';
 import { isAudioRunning, playOrderAlert, unlockAudio } from '../../lib/audio';
 import { minutesSince } from '../../lib/time';
-import { Banner, Button, ConfirmDialog, ErrorState, IconButton, Loading, Sheet } from '../../ui';
+import type { StationRow } from '../../data/types';
+import { useFeature } from '../../entitlements/hooks';
+import { readJson, writeJson } from '../../lib/storage';
+import { Banner, Button, ConfirmDialog, ErrorState, IconButton, Loading, Segmented, Sheet } from '../../ui';
+import { PrintSheet, ticketSlips, type Slip } from '../print';
+import { useErrorText } from '../staff/errors';
 import { ageClass, columnIndexOf, effectiveColumns, nextMove, prevMove, type AgeClass, type Move } from './columns';
 import { useKitchenT } from './messages';
+
+const STATION_KEY = 'lapar.kitchen.station';
+
+/** Station picker (Pro: multi_station); the choice is remembered per device. Basic shows the one board. */
+export function KitchenView({ shopId }: { shopId: string }) {
+  const api = useData();
+  const multi = useFeature('multi_station');
+  const [stations, setStations] = useState<StationRow[] | null>(null);
+  const [stationId, setStationId] = useState<string | null>(() => readJson<string | null>(STATION_KEY, null));
+
+  useEffect(() => {
+    if (!multi) return;
+    let live = true;
+    api.staff.listStations(shopId).then(
+      (list) => {
+        if (!live) return;
+        setStations(list);
+        setStationId((id) => (list.some((s) => s.id === id) ? id : (list[0]?.id ?? null)));
+      },
+      () => live && setStations([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, shopId, multi]);
+
+  if (multi && !stations) return <Loading />;
+  const choose = (id: string) => (setStationId(id), writeJson(STATION_KEY, id));
+  return <KitchenBoard key={multi ? stationId : 'default'} shopId={shopId} stationId={multi ? stationId : null} stations={multi ? (stations ?? []) : []} onStation={choose} />;
+}
 
 const CORE_KEY = { new: 'col_new', preparing: 'col_preparing', cooking: 'col_cooking', ready: 'col_ready' } as const;
 const AGE_STYLE: Record<AgeClass, string> = {
@@ -15,8 +50,11 @@ const AGE_STYLE: Record<AgeClass, string> = {
   red: 'border-red-950 bg-red-700 text-white',
 };
 
-export function KitchenView({ shopId }: { shopId: string }) {
+function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: string; stationId: string | null; stations: StationRow[]; onStation: (id: string) => void }) {
   const t = useKitchenT();
+  const errorText = useErrorText();
+  const printing = useFeature('printing');
+  const [slips, setSlips] = useState<Slip[] | null>(null);
   const api = useData();
   const online = useOnline();
   const visible = usePageVisible();
@@ -35,7 +73,7 @@ export function KitchenView({ shopId }: { shopId: string }) {
   // Minutes use the server's clock, so a wrong tablet clock does not show wrong ages.
   const q = useLiveQuery(
     async () => {
-      const b = await api.staff.getBoard(shopId, null);
+      const b = await api.staff.getBoard(shopId, stationId);
       offsetMs.current = new Date(b.serverNow).getTime() - Date.now();
       setNowMs(new Date(b.serverNow).getTime());
       return b;
@@ -80,7 +118,7 @@ export function KitchenView({ shopId }: { shopId: string }) {
     try {
       await api.staff.advanceItem(line.id, move.to, move.columnId);
     } catch (e) {
-      setActionError(toLaparError(e).code);
+      setActionError(errorText(e));
     } finally {
       setBusy((b) => (b.delete(line.id), new Set(b)));
       q.reload();
@@ -124,6 +162,7 @@ export function KitchenView({ shopId }: { shopId: string }) {
         {(!online || q.connection === 'offline') && <Banner kind="error">{t('banner_offline')}</Banner>}
         {actionError && <Banner kind="error">{actionError}</Banner>}
       </div>
+      {stations.length > 1 && <Segmented label={t('station_picker')} options={stations.map((s) => ({ value: s.id, label: s.name }))} value={board.stationId} onChange={onStation} />}
       <div className="flex flex-1 flex-col gap-4 md:flex-row">
         {columns.map((col, ci) => {
           const lines = board.lines.filter((l) => columnIndexOf(l, columns) === ci);
@@ -184,6 +223,19 @@ export function KitchenView({ shopId }: { shopId: string }) {
                 {t('move_back', { name: colName(backCol) })}
               </Button>
             )}
+            {printing && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const order = board.lines.filter((l) => l.orderId === menuFor.orderId);
+                  const place = menuFor.tableKind === 'counter' && menuFor.pickupNo != null ? `#${menuFor.pickupNo}` : menuFor.tableLabel;
+                  setSlips(ticketSlips({ place, createdAt: menuFor.approvedAt, pickupAt: null, lines: order }, [{ id: board.stationId, name: board.stationName }]));
+                  setMenuFor(null);
+                }}
+              >
+                {t('print_ticket')}
+              </Button>
+            )}
             <Button
               variant="danger"
               onClick={() => {
@@ -196,6 +248,7 @@ export function KitchenView({ shopId }: { shopId: string }) {
           </div>
         )}
       </Sheet>
+      <PrintSheet slips={slips} onClose={() => setSlips(null)} />
       <ConfirmDialog
         open={!!cancelFor}
         title={cancelFor ? t('cancel_title', { name: cancelFor.name }) : ''}

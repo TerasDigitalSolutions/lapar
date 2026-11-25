@@ -6,6 +6,7 @@ type Key =
   | 'col_new' | 'col_preparing' | 'col_cooking' | 'col_ready'
   | 'empty_column' | 'position' | 'minutes' | 'from_set' | 'next_to' | 'served'
   | 'menu_title' | 'menu_open' | 'move_back' | 'cancel_item'
+  | 'print_ticket' | 'station_picker'
   | 'cancel_title' | 'cancel_body' | 'cancel_confirm' | 'keep';
 
 export const useKitchenT = defineMessages<Key>('kitchen', {
@@ -35,5 +36,7 @@ export const useKitchenT = defineMessages<Key>('kitchen', {
     cancel_body: 'This removes it from the board and from the bill.',
     cancel_confirm: 'Cancel item',
     keep: 'Keep it',
+    print_ticket: 'Print ticket',
+    station_picker: 'Station',
   },
 });

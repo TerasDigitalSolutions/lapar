@@ -3,7 +3,10 @@ import { useData } from '../../data/context';
 import { useLiveQuery, usePolling } from '../../data/hooks';
 import type { BoardLineDTO, LineOption, PendingOrderDTO, ServiceReason, ServiceRequestDTO } from '../../data/types';
 import { minutesSince } from '../../lib/time';
+import { useFeature } from '../../entitlements/hooks';
 import { Button, ErrorState, Sheet, useToast } from '../../ui';
+import { hhmm, PrintSheet, ticketSlips, type Slip } from '../print';
+import { useErrorText } from './errors';
 import { useStaffT } from './messages';
 
 /** Re-renders every 30 s so "minutes waiting" stays current. */
@@ -76,12 +79,15 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
   const api = useData().staff;
   const toast = useToast();
   const now = useNow();
+  const errorText = useErrorText();
+  const printing = useFeature('printing');
+  const [slips, setSlips] = useState<Slip[] | null>(null);
   const [rejecting, setRejecting] = useState<PendingOrderDTO | null>(null);
   const ready = useLiveQuery(() => api.listReadyLines(shopId), { shopId, tables: ['orders', 'order_items'] });
 
   const run = (fn: () => Promise<void>) =>
-    fn().then(reload, () => {
-      toast(t('action_failed'), 'error');
+    fn().then(reload, (e: unknown) => {
+      toast(errorText(e), 'error');
       reload();
     });
 
@@ -89,6 +95,13 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
   for (const l of ready.data ?? []) grouped.set(l.orderId, [...(grouped.get(l.orderId) ?? []), l]);
   const place = (o: { tableKind: string; tableLabel: string; pickupNo: number | null }) =>
     o.tableKind === 'counter' && o.pickupNo ? t('pickup_no', { n: o.pickupNo }) : o.tableLabel;
+  const approve = async (o: PendingOrderDTO) => {
+    await run(() => api.approveOrder(o.orderId));
+    if (!printing) return;
+    // Station names only head the ticket; a failed lookup must not hide the preview.
+    const stations = await api.listStations(shopId).catch(() => []);
+    setSlips(ticketSlips({ place: place(o), createdAt: o.createdAt, pickupAt: o.pickupAt, lines: o.lines }, stations));
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -102,6 +115,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
                 <span className="text-xl font-bold text-stone-900">{place(o)}</span>
                 <Waiting since={o.createdAt} now={now} />
               </div>
+              {o.pickupAt && <p className="text-sm font-semibold text-stone-700">{t('pickup_time', { time: hhmm(o.pickupAt) })}</p>}
               <ul className="my-2 text-base text-stone-800">
                 {o.lines.map((l) => (
                   <li key={l.id}>
@@ -111,7 +125,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
                 ))}
               </ul>
               <div className="grid grid-cols-2 gap-3">
-                <Button onClick={() => void run(() => api.approveOrder(o.orderId))}>{t('approve')}</Button>
+                <Button onClick={() => void approve(o)}>{t('approve')}</Button>
                 <Button variant="secondary" onClick={() => setRejecting(o)}>{t('reject')}</Button>
               </div>
             </li>
@@ -171,6 +185,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
         </ul>
       </section>
 
+      <PrintSheet slips={slips} onClose={() => setSlips(null)} />
       <RejectSheet
         order={rejecting}
         onClose={() => setRejecting(null)}

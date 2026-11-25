@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { DataProvider } from '../../data/context';
 import { createDemoData } from '../../data/demo';
 import { LaparError, type LaparDemoData } from '../../data/types';
+import { EntitlementsProvider } from '../../entitlements/hooks';
+import { PLAN_DEFAULTS } from '../../entitlements/keys';
 import { ToastProvider } from '../../ui';
 import { StaffPinForm } from './StaffPinForm';
 import { StaffView } from './StaffView';
@@ -20,9 +22,11 @@ afterEach(cleanup);
 const renderStaff = () =>
   render(
     <DataProvider value={d}>
-      <ToastProvider>
-        <StaffView shopId={SHOP} />
-      </ToastProvider>
+      <EntitlementsProvider value={PLAN_DEFAULTS.basic}>
+        <ToastProvider>
+          <StaffView shopId={SHOP} />
+        </ToastProvider>
+      </EntitlementsProvider>
     </DataProvider>,
   );
 

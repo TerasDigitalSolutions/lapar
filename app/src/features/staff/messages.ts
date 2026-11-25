@@ -12,6 +12,8 @@ type Key =
   | 'tab_detail' | 'order_n' | 'order_pending' | 'order_rejected' | 'total' | 'paid' | 'remaining'
   | 'pending_warning' | 'mark_paid' | 'pay_method' | 'm_cash' | 'm_duitnow' | 'm_card' | 'm_other'
   | 'pay_collect' | 'pay_rounding' | 'pay_confirm' | 'paid_closed' | 'nothing_owed'
+  | 'err_mixed_split' | 'print_ticket' | 'print_bill' | 'pickup_time' | 'pickup_board_open' | 'pickup_board_close'
+  | 'split_mode' | 'split_full' | 'split_items' | 'split_equal' | 'split_items_hint' | 'split_people' | 'split_share'
   | 'soldout_hint' | 'soldout_empty' | 'soldout_on'
   | 'pin_title' | 'pin_shop' | 'pin_shop_hint' | 'pin_pin' | 'pin_digits' | 'pin_backspace' | 'pin_submit'
   | 'pin_shop_required' | 'pin_len' | 'pin_wrong' | 'pin_locked' | 'pin_not_found' | 'pin_failed';
@@ -37,6 +39,11 @@ export const useStaffT = defineMessages<Key>('staff', {
     mark_paid: 'Mark paid', pay_method: 'How did they pay?', m_cash: 'Cash', m_duitnow: 'DuitNow QR', m_card: 'Card', m_other: 'Other',
     pay_collect: 'Collect {amount}', pay_rounding: 'Rounding {amount}', pay_confirm: 'Confirm paid',
     paid_closed: 'Paid. The bill is closed.', nothing_owed: 'Nothing left to pay.',
+    err_mixed_split: 'Part of this bill was paid by amount, so it cannot also be split by item.',
+    print_ticket: 'Print ticket', print_bill: 'Print bill', pickup_time: 'Pickup {time}',
+    pickup_board_open: 'Open pickup board', pickup_board_close: 'Close pickup board',
+    split_mode: 'How to pay', split_full: 'Whole bill', split_items: 'By item', split_equal: 'Equally',
+    split_items_hint: 'Tick what this person is paying for.', split_people: 'People', split_share: 'Share for one of {n} still to pay',
     soldout_hint: 'Switch on what has run out. Customers will not be able to order it.', soldout_empty: 'No dishes yet.',
     soldout_on: 'Sold out',
     pin_title: 'Staff sign in', pin_shop: 'Shop code', pin_shop_hint: 'Ask the owner if you do not know it',

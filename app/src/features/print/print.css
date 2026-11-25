@@ -1,0 +1,25 @@
+/* 58 mm thermal roll. Only #lapar-print-root prints; the rest of the app is hidden. */
+@page {
+  size: 58mm auto;
+  margin: 0;
+}
+#lapar-print-root {
+  display: none;
+}
+@media print {
+  body > *:not(#lapar-print-root) {
+    display: none !important;
+  }
+  #lapar-print-root {
+    display: block !important;
+  }
+  #lapar-print-root .slip {
+    width: 58mm;
+    padding: 3mm;
+    margin: 0;
+    break-after: page;
+    color: #000;
+    background: #fff;
+    box-shadow: none;
+  }
+}
