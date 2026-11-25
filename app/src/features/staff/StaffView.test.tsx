@@ -94,3 +94,39 @@ test('PIN form validates and maps errors', async () => {
   await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('kopitiam-teras', '1234'));
   expect(await screen.findByText('That PIN is not right.')).toBeTruthy();
 });
+
+test('set meal components are indented under their set line in approvals', async () => {
+  d.setPlan('pro');
+  await d.customer.placeOrder('demo-table-01', { lines: [{ itemId: 'item-set-a', qty: 1, optionIds: [] }] });
+  renderStaff();
+  const order = await screen.findByTestId('pending-order');
+  const comps = [...order.querySelectorAll('li.ml-4')];
+  expect(comps.length).toBeGreaterThan(0);
+  expect(comps.map((c) => c.textContent).join()).toContain('Nasi');
+});
+
+test('a failed approval opens no print preview on Pro', async () => {
+  d.setPlan('pro');
+  await d.customer.placeOrder('demo-table-01', { lines: [NASI] });
+  vi.spyOn(d.staff, 'approveOrder').mockRejectedValue(new LaparError('invalid_transition'));
+  render(
+    <DataProvider value={d}>
+      <EntitlementsProvider value={PLAN_DEFAULTS.pro}>
+        <ToastProvider>
+          <StaffView shopId={SHOP} />
+        </ToastProvider>
+      </EntitlementsProvider>
+    </DataProvider>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+  await waitFor(() => expect(vi.mocked(d.staff.approveOrder)).toHaveBeenCalled());
+  await new Promise((r) => setTimeout(r, 50));
+  expect(screen.queryByTestId('receipt-preview')).toBeNull();
+});
+
+test('the Counter tile is hidden on Basic', async () => {
+  localStorage.setItem('lapar.staff.tab', JSON.stringify('tables'));
+  renderStaff();
+  expect(await screen.findByText('Table 1')).toBeTruthy();
+  expect(screen.queryByText('Counter')).toBeNull();
+});

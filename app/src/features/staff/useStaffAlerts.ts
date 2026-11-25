@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PendingOrderDTO, ServiceRequestDTO } from '../../data/types';
-import { isAudioRunning, playCallAlert, playOrderAlert, unlockAudio, vibrate } from '../../lib/audio';
+import { isAudioRunning, onAudioStateChange, playCallAlert, playOrderAlert, unlockAudio, vibrate } from '../../lib/audio';
 
 const REPEAT_MS = 30_000;
 
@@ -41,6 +41,8 @@ export function useStaffAlerts(pending: PendingOrderDTO[] | null, calls: Service
     }, REPEAT_MS);
     return () => clearInterval(id);
   }, [pendingCount, openCallCount, alertOrder, alertCall]);
+
+  useEffect(() => onAudioStateChange(() => setSoundOn(isAudioRunning())), []);
 
   const enable = useCallback(async () => setSoundOn(await unlockAudio()), []);
   return { soundOn, enable };

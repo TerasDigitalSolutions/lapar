@@ -86,18 +86,21 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
   const ready = useLiveQuery(() => api.listReadyLines(shopId), { shopId, tables: ['orders', 'order_items'] });
 
   const run = (fn: () => Promise<void>) =>
-    fn().then(reload, (e: unknown) => {
-      toast(errorText(e), 'error');
-      reload();
-    });
+    fn().then(
+      () => (reload(), true),
+      (e: unknown) => {
+        toast(errorText(e), 'error');
+        reload();
+        return false;
+      },
+    );
 
   const grouped = new Map<string, BoardLineDTO[]>();
   for (const l of ready.data ?? []) grouped.set(l.orderId, [...(grouped.get(l.orderId) ?? []), l]);
   const place = (o: { tableKind: string; tableLabel: string; pickupNo: number | null }) =>
     o.tableKind === 'counter' && o.pickupNo ? t('pickup_no', { n: o.pickupNo }) : o.tableLabel;
   const approve = async (o: PendingOrderDTO) => {
-    await run(() => api.approveOrder(o.orderId));
-    if (!printing) return;
+    if (!(await run(() => api.approveOrder(o.orderId))) || !printing) return;
     // Station names only head the ticket; a failed lookup must not hide the preview.
     const stations = await api.listStations(shopId).catch(() => []);
     setSlips(ticketSlips({ place: place(o), createdAt: o.createdAt, pickupAt: o.pickupAt, lines: o.lines }, stations));
@@ -118,7 +121,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
               {o.pickupAt && <p className="text-sm font-semibold text-stone-700">{t('pickup_time', { time: hhmm(o.pickupAt) })}</p>}
               <ul className="my-2 text-base text-stone-800">
                 {o.lines.map((l) => (
-                  <li key={l.id}>
+                  <li key={l.id} className={l.kind === 'component' ? 'ml-4 text-stone-600' : undefined}>
                     {lineLabel(l.name, l.qty, l.options)}
                     {l.note && <span className="block text-sm text-stone-600">“{l.note}”</span>}
                   </li>

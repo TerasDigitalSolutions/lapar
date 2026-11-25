@@ -3,12 +3,12 @@ import type { TableRow } from '../../data/types';
 import { qrSvg, tableQrUrl } from '../../lib/qr';
 import { useManagerT } from './messages';
 
-// Hidden on screen. When printing, every other child of <body> is hidden and the cards fill A4 pages.
+// Hidden on screen. When printing (only while this sheet is mounted), every other child of <body> is hidden and the cards fill A4 pages.
 const CSS = `
 .qr-print-root{display:none}
+@page{size:A4;margin:10mm}
 @media print{
-  @page{size:A4;margin:10mm}
-  body>*:not(.qr-print-root){display:none!important}
+  body:has(>.qr-print-root)>*:not(.qr-print-root){display:none!important}
   .qr-print-root{display:grid;grid-template-columns:1fr 1fr;gap:8mm;color:#000;background:#fff}
   .qr-card{break-inside:avoid;border:0.4mm solid #000;border-radius:4mm;padding:6mm;text-align:center}
   .qr-card svg{display:block;width:62mm;height:62mm;margin:3mm auto}

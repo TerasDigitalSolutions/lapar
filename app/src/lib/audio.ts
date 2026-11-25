@@ -1,5 +1,6 @@
 // WebAudio alerts for staff and kitchen. Every function is a no-op without WebAudio.
 let ctx: AudioContext | null = null;
+const listeners = new Set<() => void>();
 
 function getCtx(): AudioContext | null {
   if (ctx) return ctx;
@@ -10,6 +11,7 @@ function getCtx(): AudioContext | null {
   if (!Ctor) return null;
   try {
     ctx = new Ctor();
+    ctx.addEventListener('statechange', () => listeners.forEach((l) => l()));
   } catch {
     ctx = null;
   }
@@ -26,6 +28,12 @@ export async function unlockAudio(): Promise<boolean> {
     /* blocked until a gesture */
   }
   return c.state === 'running';
+}
+
+/** Calls `cb` whenever the AudioContext changes state (e.g. suspended -> running). Returns an unsubscribe. */
+export function onAudioStateChange(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => void listeners.delete(cb);
 }
 
 export const isAudioRunning = (): boolean => ctx?.state === 'running';

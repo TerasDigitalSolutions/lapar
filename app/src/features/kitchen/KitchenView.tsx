@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useData } from '../../data/context';
 import { useLiveQuery, useOnline, usePageVisible, usePolling } from '../../data/hooks';
 import type { BoardColumnDTO, BoardLineDTO } from '../../data/types';
-import { isAudioRunning, playOrderAlert, unlockAudio } from '../../lib/audio';
+import { isAudioRunning, onAudioStateChange, playOrderAlert, unlockAudio } from '../../lib/audio';
 import { minutesSince } from '../../lib/time';
 import type { StationRow } from '../../data/types';
 import { useFeature } from '../../entitlements/hooks';
@@ -12,6 +12,9 @@ import { PrintSheet, ticketSlips, type Slip } from '../print';
 import { useErrorText } from '../staff/errors';
 import { ageClass, columnIndexOf, effectiveColumns, nextMove, prevMove, type AgeClass, type Move } from './columns';
 import { useKitchenT } from './messages';
+
+// Start shift shows once per page load, not on every remount (view/plan/station switch).
+let shiftStarted = false;
 
 const STATION_KEY = 'lapar.kitchen.station';
 
@@ -58,8 +61,9 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
   const api = useData();
   const online = useOnline();
   const visible = usePageVisible();
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(shiftStarted);
   const [sound, setSound] = useState(false);
+  const [, setAudioTick] = useState(0);
   const [wakeOk, setWakeOk] = useState(true);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
@@ -102,7 +106,9 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
   }, [started, visible]);
 
   const enableSound = useCallback(async () => setSound(await unlockAudio()), []);
+  useEffect(() => onAudioStateChange(() => setAudioTick((n) => n + 1)), []);
   const start = async () => {
+    shiftStarted = true;
     setStarted(true);
     void enableSound();
     try {
@@ -130,7 +136,7 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
   const columns = effectiveColumns(board.columns);
   const now = new Date(nowMs);
   const colName = (c: BoardColumnDTO) => c.name ?? t(CORE_KEY[c.coreStatus]);
-  const soundOn = sound && isAudioRunning();
+  const soundOn = (sound || shiftStarted) && isAudioRunning();
   const backCol = menuFor ? columns[columnIndexOf(menuFor, columns) - 1] : undefined;
   const back = menuFor ? prevMove(menuFor, columns) : null;
 
@@ -159,7 +165,7 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
           </Banner>
         )}
         {started && (!wakeOk || !navigator.wakeLock) && <Banner kind="warn">{t('banner_wake')}</Banner>}
-        {(!online || q.connection === 'offline') && <Banner kind="error">{t('banner_offline')}</Banner>}
+        {((!online && api.kind !== 'demo') || q.connection === 'offline') && <Banner kind="error">{t('banner_offline')}</Banner>}
         {actionError && <Banner kind="error">{actionError}</Banner>}
       </div>
       {stations.length > 1 && <Segmented label={t('station_picker')} options={stations.map((s) => ({ value: s.id, label: s.name }))} value={board.stationId} onChange={onStation} />}
@@ -179,27 +185,27 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
                 const age = ageClass(mins);
                 const label = line.tableKind === 'counter' && line.pickupNo != null ? `#${line.pickupNo}` : line.tableLabel;
                 return (
-                  <article key={line.id} data-age={age} className={`flex items-stretch rounded-2xl border-4 ${AGE_STYLE[age]}`}>
+                  <article key={line.id} data-age={age} className={`relative flex items-stretch rounded-2xl border-4 ${AGE_STYLE[age]}`}>
                     <button
                       type="button"
                       disabled={busy.has(line.id)}
                       onClick={() => void advance(line, nextMove(line, columns))}
-                      aria-label={`${line.qty} × ${line.name}. ${t('next_to', { name: nextName })}`}
-                      className="min-h-28 min-w-0 flex-1 p-4 text-left disabled:opacity-60"
+                      aria-label={`${line.qty} × ${line.name}. ${t('next_to', { name: nextName })}. ${label}, ${t('position', { n: line.position, total: line.positionOf })}, ${t('minutes', { n: mins })}`}
+                      className="min-h-28 min-w-0 flex-1 p-4 pr-16 text-left disabled:opacity-60"
                     >
-                      <span className="block text-3xl font-extrabold break-words">
+                      <span className="block text-2xl font-extrabold">
                         {line.qty} × {line.name}
                       </span>
                       {line.options.length > 0 && <span className="block text-xl font-semibold">{line.options.map((o) => o.name).join(', ')}</span>}
                       {line.parentName && <span className="block text-lg">{t('from_set', { name: line.parentName })}</span>}
                       {line.note && <span className="mt-1 block rounded bg-black/15 px-2 py-1 text-xl font-bold">{line.note}</span>}
-                      <span className="mt-2 flex flex-wrap items-baseline gap-x-4 text-xl font-bold">
-                        <span className="text-2xl">{label}</span>
+                      <span className="mt-2 flex items-baseline gap-x-3 whitespace-nowrap text-lg font-bold">
+                        <span className="text-xl">{label}</span>
                         <span>{t('position', { n: line.position, total: line.positionOf })}</span>
                         <span>{t('minutes', { n: mins })}</span>
                       </span>
                     </button>
-                    <IconButton label={t('menu_open', { name: line.name })} onClick={() => setMenuFor(line)} className="m-2 size-14 self-start text-2xl text-inherit">
+                    <IconButton label={t('menu_open', { name: line.name })} onClick={() => setMenuFor(line)} className="absolute right-1 top-1 size-12 text-2xl text-inherit">
                       ⋯
                     </IconButton>
                   </article>

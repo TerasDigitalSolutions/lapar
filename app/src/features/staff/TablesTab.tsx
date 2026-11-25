@@ -228,7 +228,7 @@ export function TablesTab({ shopId }: { shopId: string }) {
   if (!tables.data) return tables.error ? <ErrorState error={tables.error} onRetry={tables.reload} /> : <Loading />;
   if (tables.data.length === 0) return <EmptyState title={t('tables_empty')} />;
 
-  const tiles = tables.data.flatMap<Tile>((table) =>
+  const tiles = tables.data.filter((table) => takeaway || table.kind !== 'counter').flatMap<Tile>((table) =>
     table.openTabs.length ? table.openTabs.map((tab) => ({ key: tab.id, table, tab })) : [{ key: table.tableId, table, tab: null }],
   );
   const token = shop?.pickupBoardToken;
