@@ -9,6 +9,7 @@ test('toLaparError maps PostgREST bodies', () => {
   expect(toLaparError({ code: 'P0001', message: 'sold_out', details: 'abc' })).toMatchObject({ code: 'sold_out', detail: 'abc' });
   expect(toLaparError({ code: '23503', message: 'fk' }).code).toBe('in_use');
   expect(toLaparError({ message: 'JWT expired' }).code).toBe('not_signed_in');
+  expect(toLaparError({ status: 400, code: 'invalid_credentials', message: 'Invalid login credentials' })).toMatchObject({ code: 'invalid_input', detail: 'credentials' });
   expect(toLaparError({ status: 401, message: 'x' }).code).toBe('not_signed_in');
   expect(toLaparError(new TypeError('Failed to fetch')).code).toBe('network');
   expect(toLaparError({ message: 'boom' }).code).toBe('unknown');

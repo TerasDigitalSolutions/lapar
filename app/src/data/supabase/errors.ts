@@ -17,6 +17,10 @@ export function toLaparError(e: unknown): LaparError {
   const detail = typeof r.details === 'string' && r.details ? r.details : undefined;
   if (isCode(r.message)) return new LaparError(r.message, detail);
   if (r.code === '23503') return new LaparError('in_use');
+  // Supabase Auth: wrong email or password (status 400) — the sign-in screen shows it as a credentials error.
+  if (r.code === 'invalid_credentials' || (typeof r.message === 'string' && /invalid login credentials/i.test(r.message))) {
+    return new LaparError('invalid_input', 'credentials');
+  }
   if (r.status === 401 || (typeof r.message === 'string' && /jwt/i.test(r.message))) return new LaparError('not_signed_in');
   if (typeof r.message === 'string' && /failed to fetch|network|load failed/i.test(r.message)) return new LaparError('network');
   return new LaparError('unknown', typeof r.message === 'string' ? r.message : undefined);
