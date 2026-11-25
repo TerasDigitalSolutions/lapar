@@ -89,4 +89,4 @@ Newest first within each section. Each entry: what was decided, why, and where i
 | Q4 | One-time setup, partly done 2026-11-25: migrations and the Edge Function are deployed, auth settings applied (B8), Pages source and the `SUPABASE_PUBLIC_KEY` variable set. Still Eshan's: the first admin user, GitHub secrets (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`), and for backups the private `lapar-backups` repo, an `age` key and `BACKUP_REPO_TOKEN`. |
 | Q5 | Who reviews the Bahasa Malaysia and Chinese drafts (customer screens and seed menu translations), and when. |
 | Q6 | Demo photos: initials placeholders until real or licensed photos are supplied. |
-| Q7 | Per-shop PIN lockout lets anyone who knows the shop code lock staff out for 10 minutes. Keep (brief rule), or lock per device instead? |
+| ~~Q7~~ | Resolved 2026-11-25 by O9: the lockout now needs the secret staff code, which customers never see. |
