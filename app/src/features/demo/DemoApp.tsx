@@ -108,7 +108,7 @@ function Shell({ demo }: { demo: LaparDemoData }) {
     }
   };
 
-  const customer = <CustomerView key={`${activeToken}:${resetKey}`} tableToken={activeToken} />;
+  const customer = <CustomerView key={`${activeToken}:${resetKey}`} tableToken={activeToken} live />;
   const side = view === 'manager' ? <ManagerView key={resetKey} shopId={demo.shopId} /> : <StaffView key={resetKey} shopId={demo.shopId} />;
 
   return (
