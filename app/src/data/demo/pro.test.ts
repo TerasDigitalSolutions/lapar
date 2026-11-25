@@ -10,7 +10,7 @@ const TEH = (qty = 1) => line('item-teh-tarik', qty, { optionIds: ['opt-teh-tari
 
 let clock: Date;
 const make = async (plan: 'basic' | 'pro' = 'pro'): Promise<LaparDemoData> => {
-  const d = createDemoData({ persist: false, now: () => clock });
+  const d = createDemoData({ persist: false, now: () => clock, history: false });
   d.setPlan(plan);
   await d.owner.updateShopSettings(SHOP, { approvalMode: 'none' });
   return d;

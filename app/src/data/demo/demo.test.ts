@@ -11,7 +11,7 @@ const TEH = { itemId: 'item-teh-tarik', qty: 1, optionIds: ['opt-teh-tarik-ais']
 
 let clock: Date;
 const advance = (ms: number) => void (clock = new Date(clock.getTime() + ms));
-const make = (): LaparDemoData => createDemoData({ persist: false, now: () => clock });
+const make = (): LaparDemoData => createDemoData({ persist: false, now: () => clock, history: false });
 const rejects = async (p: Promise<unknown>, code: string, detail?: string) => {
   const err = await p.then(
     () => null,
@@ -426,7 +426,7 @@ describe('plan, Pro stubs and admin', () => {
     expect((await d.customer.getMenu(T1)).features.promos).toBe(true);
     expect((await d.customer.getMenu(T1)).items.some((i) => i.id === 'item-set-a')).toBe(true);
     expect((await d.staff.listPendingOrders(SHOP)).length).toBe(1);
-    await rejects(d.pro.getSalesReport(SHOP, '2026-11-01', '2026-11-25'), 'not_implemented', 'full_reports');
+    expect((await d.pro.getSalesReport(SHOP, '2026-11-01', '2026-11-25')).byDay.length).toBeGreaterThan(0);
     d.setPlan('basic');
     await rejects(d.pro.listPromos(SHOP), 'feature_not_enabled', 'promos');
     await rejects(d.pro.exportShopMeta(SHOP), 'feature_not_enabled', 'export_backup');

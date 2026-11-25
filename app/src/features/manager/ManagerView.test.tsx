@@ -175,5 +175,5 @@ test('Pro sections show a lock on Basic and open on Pro', async () => {
   cleanup();
   setup('pro');
   fireEvent.click(screen.getByRole('button', { name: /Reports/ }));
-  expect(await screen.findByText('Coming soon')).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Sales by day' })).toBeTruthy();
 });

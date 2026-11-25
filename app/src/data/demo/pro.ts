@@ -130,21 +130,21 @@ export function createProApi(ctx: Ctx): ProApi {
       return s().shop.pickupBoardToken!;
     },
 
-    async getSalesReport(shopId) {
+    async getSalesReport(shopId, from, to) {
       assertShop(ctx, shopId);
-      return getSalesReport(ctx);
+      return getSalesReport(ctx, from, to);
     },
-    async getUpsellReport(shopId) {
+    async getUpsellReport(shopId, month) {
       assertShop(ctx, shopId);
-      return getUpsellReport(ctx);
+      return getUpsellReport(ctx, month);
     },
     async exportShopMeta(shopId) {
       assertShop(ctx, shopId);
       return exportShopMeta(ctx);
     },
-    async exportOrders(shopId) {
+    async exportOrders(shopId, from, to) {
       assertShop(ctx, shopId);
-      return exportOrders(ctx);
+      return exportOrders(ctx, from, to);
     },
   };
 }

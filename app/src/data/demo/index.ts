@@ -25,6 +25,8 @@ export interface DemoOptions {
   persist?: boolean;
   /** Clock for timestamps; tests pass a fake. */
   now?: () => Date;
+  /** Add the generated 30-day order history (default true); tests of live flows turn it off. */
+  history?: boolean;
 }
 
 /** Results are copied so screens never hold references into the store. */
@@ -39,11 +41,12 @@ function isolate<T extends object>(api: T): T {
   return out as T;
 }
 
-export function createDemoData({ persist = true, now = () => new Date() }: DemoOptions = {}): LaparDemoData {
+export function createDemoData({ persist = true, now = () => new Date(), history = true }: DemoOptions = {}): LaparDemoData {
   const emitter = createEmitter();
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const build = (base: DemoState): DemoState => {
+    if (!history) return base;
     const h = generateHistory(base, mytToday(now()));
     return {
       ...base,
