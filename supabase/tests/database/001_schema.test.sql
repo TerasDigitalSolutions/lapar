@@ -12,7 +12,7 @@ select tables_are('public', array[
 select is((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
            where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity), 0::bigint, 'RLS on for every table');
 select is((select count(*) from information_schema.role_table_grants
-           where table_schema = 'public' and grantee in ('anon', 'authenticated')), 0::bigint, 'no table grants for client roles yet');
+           where table_schema = 'public' and grantee = 'anon'), 0::bigint, 'no table grants for anon');
 
 -- Entitlements
 select is((select count(*) from public.entitlement_keys where kind = 'feature'), 25::bigint, '25 feature keys');
@@ -57,38 +57,38 @@ select matches(public.new_token(), '^[A-Za-z0-9_-]{24}$', 'new_token is 24 url-s
 
 -- Fixtures: two shops
 insert into public.shops (id, name, slug) values
-  (md5('shop:a')::uuid, 'Shop A', 'shop-a'), (md5('shop:b')::uuid, 'Shop B', 'shop-b');
+  (md5('t1:shop:a')::uuid, 'Shop A', 'shop-a'), (md5('t1:shop:b')::uuid, 'Shop B', 'shop-b');
 insert into public.stations (id, shop_id, name) values
-  (md5('station:a')::uuid, md5('shop:a')::uuid, 'Kitchen'), (md5('station:b')::uuid, md5('shop:b')::uuid, 'Kitchen');
+  (md5('t1:station:a')::uuid, md5('t1:shop:a')::uuid, 'Kitchen'), (md5('t1:station:b')::uuid, md5('t1:shop:b')::uuid, 'Kitchen');
 insert into public.categories (id, shop_id, name) values
-  (md5('cat:a')::uuid, md5('shop:a')::uuid, 'Drinks'), (md5('cat:b')::uuid, md5('shop:b')::uuid, 'Drinks');
+  (md5('t1:cat:a')::uuid, md5('t1:shop:a')::uuid, 'Drinks'), (md5('t1:cat:b')::uuid, md5('t1:shop:b')::uuid, 'Drinks');
 insert into public.tables (id, shop_id, label, token) values
-  (md5('table:a:1')::uuid, md5('shop:a')::uuid, 'Table 1', 'tok-aaaaaaaaaaaaaaaaaaaaaa');
+  (md5('t1:table:a:1')::uuid, md5('t1:shop:a')::uuid, 'Table 1', 'tok-aaaaaaaaaaaaaaaaaaaaaa');
 
 select throws_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen)
-  values (md5('shop:a')::uuid, md5('cat:b')::uuid, md5('station:a')::uuid, 'X', 100)$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:b')::uuid, md5('t1:station:a')::uuid, 'X', 100)$$,
   '23503', null, 'composite FK rejects an item pointing at another shop''s category');
 select throws_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen)
-  values (md5('shop:a')::uuid, md5('cat:a')::uuid, md5('station:a')::uuid, 'X', -1)$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:a')::uuid, md5('t1:station:a')::uuid, 'X', -1)$$,
   '23514', null, 'negative price fails');
 select lives_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen)
-  values (md5('shop:a')::uuid, md5('cat:a')::uuid, md5('station:a')::uuid, 'Teh', 220)$$, 'valid item inserts');
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:a')::uuid, md5('t1:station:a')::uuid, 'Teh', 220)$$, 'valid item inserts');
 select throws_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen, photo_state, photo_url)
-  values (md5('shop:a')::uuid, md5('cat:a')::uuid, md5('station:a')::uuid, 'X', 100, 'none', 'menu/x.webp')$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:a')::uuid, md5('t1:station:a')::uuid, 'X', 100, 'none', 'menu/x.webp')$$,
   '23514', null, 'photo_state none needs a null url');
 select throws_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen, photo_state, photo_url)
-  values (md5('shop:a')::uuid, md5('cat:a')::uuid, md5('station:a')::uuid, 'X', 100, 'published', 'https://x.test/a.webp')$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:a')::uuid, md5('t1:station:a')::uuid, 'X', 100, 'published', 'https://x.test/a.webp')$$,
   '23514', null, 'published photo needs a menu/ path');
 select throws_ok($$insert into public.items (shop_id, category_id, station_id, name, price_sen, photo_state, photo_url)
-  values (md5('shop:a')::uuid, md5('cat:a')::uuid, md5('station:a')::uuid, 'X', 100, 'staging', 'menu/x.webp')$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:cat:a')::uuid, md5('t1:station:a')::uuid, 'X', 100, 'staging', 'menu/x.webp')$$,
   '23514', null, 'staging photo needs an http url');
 
-insert into public.tabs (shop_id, table_id, kind) values (md5('shop:a')::uuid, md5('table:a:1')::uuid, 'table');
+insert into public.tabs (shop_id, table_id, kind) values (md5('t1:shop:a')::uuid, md5('t1:table:a:1')::uuid, 'table');
 select throws_ok($$insert into public.tabs (shop_id, table_id, kind)
-  values (md5('shop:a')::uuid, md5('table:a:1')::uuid, 'table')$$,
+  values (md5('t1:shop:a')::uuid, md5('t1:table:a:1')::uuid, 'table')$$,
   '23505', null, 'second open tab for one table fails');
 select throws_ok($$insert into public.tables (shop_id, label, token)
-  values (md5('shop:a')::uuid, 'Table 2', 'tok-aaaaaaaaaaaaaaaaaaaaaa')$$,
+  values (md5('t1:shop:a')::uuid, 'Table 2', 'tok-aaaaaaaaaaaaaaaaaaaaaa')$$,
   '23505', null, 'duplicate table token fails');
 
 select * from finish();
