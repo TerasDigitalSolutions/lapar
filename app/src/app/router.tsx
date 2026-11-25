@@ -12,6 +12,8 @@ export const router = createHashRouter([
     children: [
       { path: '/', lazy: lazy(() => import('../features/landing')) },
       { path: '/t/:token', lazy: lazy(() => import('../features/customer')) },
+      { path: '/welcome', lazy: lazy(() => import('../features/auth')) },
+      { path: '/pickup/:token', lazy: lazy(() => import('../features/pickup')) },
       { path: '/staff', lazy: lazy(() => import('../features/staff')) },
       { path: '/manage', lazy: lazy(() => import('../features/manager')) },
       { path: '/admin', lazy: lazy(() => import('../features/admin')) },

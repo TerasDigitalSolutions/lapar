@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useData } from '../../data/context';
 import { useLiveQuery } from '../../data/hooks';
-import type { PaidMethod, RecordPaymentInput, ShopSettings, TabSummaryDTO, TableOverviewDTO } from '../../data/types';
+import type { PaidMethod, RecordPaymentInput,TabSummaryDTO, TableOverviewDTO } from '../../data/types';
 import { useFeature } from '../../entitlements/hooks';
 import { formatRM, roundCash, splitEqual } from '../../lib/money';
 import { Banner, Button, EmptyState, ErrorState, Loading, ProLocked, QtyStepper, Segmented, Sheet, useToast } from '../../ui';
@@ -208,15 +208,18 @@ export function TablesTab({ shopId }: { shopId: string }) {
   const tables = useLiveQuery(() => api.staff.listTables(shopId), { shopId, tables: ['tabs', 'orders', 'order_items', 'service_requests'] });
   const [openTab, setOpenTab] = useState<string | null>(null);
   const [board, setBoard] = useState(false);
-  const [settings, setSettings] = useState<ShopSettings | null>(null);
+  const [shop, setShop] = useState<{ name: string; pickupBoardToken: string | null } | null>(null);
 
-  // Shop name and pickup board token. Staff may not be allowed to read settings; the bill then just has no name.
+  // Shop name and pickup board token: a staff device reads them from its staff session (it may not read settings); an owner on the staff screens has none and falls back to settings.
   useEffect(() => {
     let live = true;
-    api.owner.getShopSettings(shopId).then(
-      (s) => live && setSettings(s),
-      () => undefined,
-    );
+    const set = (v: { name: string; pickupBoardToken: string | null }) => live && setShop(v);
+    api.auth
+      .getStaffSession()
+      .then((s) => (s && s.shopId === shopId ? { name: s.shopName, pickupBoardToken: s.pickupBoardToken } : null))
+      .catch(() => null)
+      .then((v) => v ?? api.owner.getShopSettings(shopId).then((o) => ({ name: o.name, pickupBoardToken: o.pickupBoardToken ?? null })))
+      .then(set, () => undefined);
     return () => {
       live = false;
     };
@@ -228,7 +231,7 @@ export function TablesTab({ shopId }: { shopId: string }) {
   const tiles = tables.data.flatMap<Tile>((table) =>
     table.openTabs.length ? table.openTabs.map((tab) => ({ key: tab.id, table, tab })) : [{ key: table.tableId, table, tab: null }],
   );
-  const token = settings?.pickupBoardToken;
+  const token = shop?.pickupBoardToken;
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -271,7 +274,7 @@ export function TablesTab({ shopId }: { shopId: string }) {
           );
         })}
       </ul>
-      {openTab && <TabSheet shopId={shopId} tabId={openTab} shopName={settings?.name ?? ''} onClose={() => setOpenTab(null)} onChanged={tables.reload} />}
+      {openTab && <TabSheet shopId={shopId} tabId={openTab} shopName={shop?.name ?? ''} onClose={() => setOpenTab(null)} onChanged={tables.reload} />}
       {board && token && (
         <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-white">
           <div className="p-3">

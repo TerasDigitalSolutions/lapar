@@ -1,10 +1,11 @@
-export default function Placeholder() {
+import { DataProvider } from '../../data/context';
+import { getSupabaseData } from '../../data/supabase';
+import { StaffGate } from './StaffGate';
+
+export default function StaffRoute() {
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-xl font-bold">Staff — coming soon</h1>
-      <a href="#/" className="mt-4 inline-flex min-h-12 items-center underline">
-        Back
-      </a>
-    </main>
+    <DataProvider value={getSupabaseData()}>
+      <StaffGate />
+    </DataProvider>
   );
 }
