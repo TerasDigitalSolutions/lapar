@@ -43,6 +43,9 @@ test('scan, order, approve, New to Served, pay and close the tab', async ({ brow
   // kitchen: New, Preparing, Cooking, Ready, then served
   await staff.getByRole('tab', { name: 'Kitchen' }).click();
   await staff.getByRole('button', { name: 'Start shift' }).click();
+  // Staff alerts and the board each subscribe to Realtime; both must stay live (no "No connection" banner).
+  await staff.waitForTimeout(2000);
+  await expect(staff.getByText(/No connection/)).toHaveCount(0);
   for (const [from, to] of [['New', 'Preparing'], ['Preparing', 'Cooking'], ['Cooking', 'Ready']]) {
     for (const item of ['Teh tarik', 'Nasi lemak']) {
       await staff.getByRole('region', { name: from }).getByRole('button', { name: new RegExp(`${item}\\. Tap: ${to}`) }).click();

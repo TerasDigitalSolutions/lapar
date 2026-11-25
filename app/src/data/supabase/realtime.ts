@@ -3,7 +3,11 @@ import { getClient } from './client';
 
 const TABLES: ShopTable[] = ['orders', 'order_items', 'service_requests', 'tabs'];
 
-/** One channel `shop:<id>` with postgres_changes for the four live tables (ARCHITECTURE 8). */
+// supabase-js returns the existing channel for a repeated topic, so a second subscriber (staff alerts
+// plus the kitchen board) would re-subscribe it and fail, and either teardown would remove both.
+let seq = 0;
+
+/** One channel `shop:<id>:<n>` per subscriber, with postgres_changes for the four live tables (ARCHITECTURE 8). */
 export function subscribeShop(
   shopId: Uuid,
   onChange: (change: ShopChange) => void,
@@ -15,7 +19,7 @@ export function subscribeShop(
   void getClient()
     .then((c) => {
       if (stopped) return;
-      const channel = c.channel(`shop:${shopId}`);
+      const channel = c.channel(`shop:${shopId}:${++seq}`);
       for (const table of TABLES) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `shop_id=eq.${shopId}` }, (p) => {
           const row = (p.eventType === 'DELETE' ? p.old : p.new) as { id?: string };
