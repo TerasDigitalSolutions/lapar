@@ -1016,9 +1016,10 @@ export interface AuthApi {
   getStaffSession(): Promise<StaffSession | null>;
   /**
    * Signs the device in anonymously if needed, then RPC claim_staff_session.
-   * Errors: not_found (shop code), invalid_pin, pin_locked, feature_not_enabled.
+   * `staffCode` is the shop's secret code (any case, dashes and spaces ignored), never the public slug.
+   * Errors: not_found (unknown staff code), invalid_pin, pin_locked, feature_not_enabled.
    */
-  claimStaffSession(shopSlug: string, pin: string): Promise<StaffSession>;
+  claimStaffSession(staffCode: string, pin: string): Promise<StaffSession>;
   /** RPC end_staff_session. Keeps the anonymous device user. */
   endStaffSession(): Promise<void>;
   /** RPC my_shops. */
@@ -1100,6 +1101,10 @@ export interface OwnerApi {
   updateStaff(staffId: Uuid, patch: { name?: string; active?: boolean }): Promise<void>;
   /** RPC set_staff_pin. Errors: duplicate_pin, invalid_input. */
   resetStaffPin(staffId: Uuid, pin: string): Promise<void>;
+  /** RPC get_staff_code: the shop's secret staff code, 8 characters (format with `formatStaffCode`). Owners only. */
+  getStaffCode(shopId: Uuid): Promise<string>;
+  /** RPC regenerate_staff_code: returns the new code; every staff session of the shop ends. */
+  regenerateStaffCode(shopId: Uuid): Promise<string>;
   /** RPC get_daily_summary. Errors: outside_report_window. */
   getDailySummary(shopId: Uuid, day: IsoDate): Promise<DailySummaryDTO>;
   /** RPC get_shop_plan. */

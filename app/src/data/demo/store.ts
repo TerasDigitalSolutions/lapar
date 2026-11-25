@@ -31,7 +31,7 @@ import type {
 } from '../types';
 
 export const STORAGE_KEY = 'lapar-demo-v1';
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 /** Generated history rows carry this id prefix; they are never persisted. */
 export const HISTORY_PREFIX = 'hist-';
 
@@ -139,6 +139,8 @@ export interface DemoState {
   staffPins: { staffId: Uuid; pin: string }[];
   /** The staff member the demo device is signed in as (null: an owner acts). */
   actorStaffId: Uuid | null;
+  /** The shop's secret staff code (8 characters, no dashes). */
+  staffCode: string;
   pinAttempts: { failures: number; lockedUntil: IsoDateTime | null };
   pickupCounters: { day: string; lastNo: number }[];
   tabs: TabRow[];

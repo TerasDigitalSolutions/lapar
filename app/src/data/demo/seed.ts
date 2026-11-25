@@ -196,6 +196,7 @@ export function seedState(nowIso: string): DemoState {
     staff: SEED_STAFF.map((s) => ({ id: s.id, shopId: SHOP_ID, name: s.name, active: true, createdAt: nowIso })),
     staffPins: SEED_STAFF.map((s) => ({ staffId: s.id, pin: s.pin })),
     actorStaffId: SEED_STAFF[0].id,
+    staffCode: 'KTRS7Q4M',
     pinAttempts: { failures: 0, lockedUntil: null },
     pickupCounters: [],
     tabs: [],

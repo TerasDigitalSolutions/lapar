@@ -155,11 +155,15 @@ Every RPC: `security definer`, `set search_path = ''`, first line a caller check
 10. Lines get `line_no` 1..n in input order. A combo line (kind `combo`, its price, `default_station`) is followed by one component line per `combo_components` row: kind `component`, item = component, prices 0, `qty = parent qty * component qty`, note copied, station routed as in step 7, `parent_line_id` set.
 11. Touch `tabs.updated_at`. Return the order with every line priced.
 
-### 6.2 Staff and owner sessions (`authenticated`) — migration 0400
+### 6.2 Staff and owner sessions (`authenticated`) — migrations 0400, 0900
+
+`shops.staff_code`: unique, 8 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no 0, O, 1, I, L), default `new_staff_code()` (so `admin_create_shop` gets one), backfilled in 0900. `set_staff_pin` (0900) also deletes that staff member's sessions.
 
 | Signature | Returns | Checks and behaviour |
 | --- | --- | --- |
-| `claim_staff_session(p_shop_slug text, p_pin text)` | `{ok, error?, lockedUntil?, session?}` | No `auth.uid()` → raise `not_signed_in`. Unknown slug → raise `not_found`. Gate `staff_pins`. Lock the shop's `pin_attempts` row (insert if missing). If `locked_until > now()` return `{ok:false, error:'pin_locked', lockedUntil}`; an expired lock resets `failures`. PIN not `^[0-9]{4,6}$` counts as wrong. Match = active staff whose `pin_hash = extensions.crypt(p_pin, pin_hash)`. Wrong: `failures + 1`; at 5 set `locked_until = now() + 10 min`, `failures = 0`; **return** `{ok:false, error:'invalid_pin' or 'pin_locked'}` — never raise here, or the counter rolls back. Right: `failures = 0`, upsert `staff_sessions` (`expires_at = now() + 16 h`), return `{ok:true, session: StaffSession}`. |
+| `claim_staff_session(p_staff_code text, p_pin text)` | `{ok, error?, lockedUntil?, session?}` | (Migration 0900 replaced the slug version; the slug no longer reaches the PIN check, DECISIONS O9.) No `auth.uid()` → raise `not_signed_in`. The code is normalised (upper case, spaces and dashes removed) and matched to `shops.staff_code`; no match (or null) → return `{ok:false, error:'invalid_code'}` and touch no counter (SupabaseData maps it to `not_found`). Gate `staff_pins`. Lock the shop's `pin_attempts` row (insert if missing). If `locked_until > now()` return `{ok:false, error:'pin_locked', lockedUntil}`; an expired lock resets `failures`. PIN not `^[0-9]{4,6}$` counts as wrong. Match = active staff whose `pin_hash = extensions.crypt(p_pin, pin_hash)`. Wrong: `failures + 1`; at 5 set `locked_until = now() + 10 min`, `failures = 0`; **return** `{ok:false, error:'invalid_pin' or 'pin_locked'}` — never raise here, or the counter rolls back. Right: `failures = 0`, upsert `staff_sessions` (`expires_at = now() + 16 h`), return `{ok:true, session: StaffSession}`. |
+| `get_staff_code(p_shop_id uuid)` | text | Owner only (`assert_owner`). The shop's 8-character code; the UI shows `XXXX-XXXX`. Staff may also read it from `shops` (RLS: own shop). Anon cannot reach it; `get_menu` does not return it. |
+| `regenerate_staff_code(p_shop_id uuid)` | text | Owner only. New random code; deletes every `staff_sessions` row of the shop (all staff devices signed out). The old code stops working at once. |
 | `my_staff_session()` | `StaffSession` or null | Live session of `auth.uid()` with active staff. |
 | `end_staff_session()` | void | Deletes the caller's session row. |
 | `my_shops()` | `OwnerShopDTO[]` | Shops the caller owns. |

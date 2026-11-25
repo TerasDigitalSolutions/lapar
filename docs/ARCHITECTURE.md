@@ -126,7 +126,7 @@ Hash router (`app/src/app/router.tsx`), one lazy chunk per route.
 | --- | --- | --- |
 | `#/` | `features/landing` (M0) | Landing, "Try the demo" → `./demo/` |
 | `#/t/:token` | `features/customer/index.tsx` (M3-A) | `DataProvider(getSupabaseData())` → `CustomerView`. A counter token switches the view to takeaway mode (counter ordering is this route). |
-| `#/staff` | `features/staff/index.tsx` (M3-C) | Owner session → shop picker → `StaffView` (no PIN). Else anonymous sign-in + `StaffPinForm` (shop code + PIN) → `StaffView`. Expired session or `forbidden` → back to the PIN form. |
+| `#/staff` | `features/staff/index.tsx` (M3-C) | Owner session → shop picker → `StaffView` (no PIN). Else anonymous sign-in + `StaffPinForm` (staff code, remembered per device, + PIN) → `StaffView`. Expired session or `forbidden` → back to the PIN form. |
 | `#/manage` | `features/manager/index.tsx` (M3-C) | Email + password sign-in → `my_shops` → shop picker if several → load entitlements → `ManagerView`. |
 | `#/admin` | `features/admin/index.tsx` (M4-B) | Sign-in → `is_platform_admin` → `AdminView`, else "Not authorised". |
 | `#/welcome?token_hash=…&type=email\|recovery` | `features/auth/index.tsx` (M3-C) | `verifyLink` → set password → `#/manage`. Expired/used link → "Ask Teras for a new link". |
@@ -141,7 +141,7 @@ QR codes encode `${SITE_BASE_URL}#/t/<token>` with `SITE_BASE_URL = https://tera
 | Who | Flow |
 | --- | --- |
 | Customer | None. The table token in the URL is the only key; all calls are anon RPCs. |
-| Staff device | `auth.signInAnonymously()` once per device, then `claim_staff_session(shop_slug, pin)`. Session lasts 16 h; device keeps the anonymous user. PIN lockout per shop: 5 wrong tries → 10 minutes. |
+| Staff device | `auth.signInAnonymously()` once per device, then `claim_staff_session(staff_code, pin)`. Session lasts 16 h; device keeps the anonymous user. PIN lockout per shop: 5 wrong tries → 10 minutes. |
 | Owner | Email + password. Account created by the admin's one-time link (no email is ever sent: Supabase Free mail only reaches the Supabase team). |
 | Teras admin | Email + password; listed in `platform_admins` (first admin inserted once by SQL, see section 13). |
 | Owner links | Admin screen → Edge Function `admin-owner-link` → `{tokenHash, verifyType}` → link `#/welcome?token_hash=…&type=…` with Copy and "Share on WhatsApp" (`https://wa.me/?text=`). The welcome page calls `verifyOtp({ token_hash, type })` (no tokens in the URL hash, so no clash with the hash router; `detectSessionInUrl` is off). Same flow for password resets (`type=recovery`). Links live 24 h (Auth email OTP expiry). |

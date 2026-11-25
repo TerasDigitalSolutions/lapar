@@ -40,20 +40,25 @@ const staffSession = { shopId: 's', shopName: 'S', shopSlug: 'shop', staffId: 's
 
 test('claim signs in anonymously first, then returns the session', async () => {
   rpcResult = { data: { ok: true, session: staffSession }, error: null };
-  expect(await authApi.claimStaffSession('shop', '1234')).toEqual(staffSession);
+  expect(await authApi.claimStaffSession('KTRS7Q4M', '1234')).toEqual(staffSession);
   expect(signInAnonymously).toHaveBeenCalledOnce();
-  expect(calls[0]).toEqual({ fn: 'claim_staff_session', args: { p_shop_slug: 'shop', p_pin: '1234' } });
-  await authApi.claimStaffSession('shop', '1234');
+  expect(calls[0]).toEqual({ fn: 'claim_staff_session', args: { p_staff_code: 'KTRS7Q4M', p_pin: '1234' } });
+  await authApi.claimStaffSession('KTRS7Q4M', '1234');
   expect(signInAnonymously).toHaveBeenCalledOnce(); // already signed in
 });
 
 test('claim maps {ok:false} to LaparError', async () => {
   rpcResult = { data: { ok: false, error: 'invalid_pin' }, error: null };
-  await expect(authApi.claimStaffSession('shop', '0000')).rejects.toMatchObject({ code: 'invalid_pin' });
+  await expect(authApi.claimStaffSession('KTRS7Q4M', '0000')).rejects.toMatchObject({ code: 'invalid_pin' });
   rpcResult = { data: { ok: false, error: 'pin_locked', lockedUntil: '2026-11-25T10:00:00Z' }, error: null };
-  const e = await authApi.claimStaffSession('shop', '0000').catch((x: unknown) => x);
+  const e = await authApi.claimStaffSession('KTRS7Q4M', '0000').catch((x: unknown) => x);
   expect(e).toBeInstanceOf(LaparError);
   expect(e).toMatchObject({ code: 'pin_locked', detail: '2026-11-25T10:00:00Z' });
+});
+
+test('claim maps an unknown staff code to not_found', async () => {
+  rpcResult = { data: { ok: false, error: 'invalid_code' }, error: null };
+  await expect(authApi.claimStaffSession('ZZZZZZZZ', '0000')).rejects.toMatchObject({ code: 'not_found' });
 });
 
 test('getStaffSession is null without a session or when the RPC says not signed in', async () => {

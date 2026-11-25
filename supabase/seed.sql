@@ -27,9 +27,10 @@ insert into public.platform_admins (user_id) values (md5('user:admin')::uuid);
 -- ---------------------------------------------------------------------------
 -- Shops, owners, stations
 -- ---------------------------------------------------------------------------
-insert into public.shops (id, name, slug, plan_id, approval_mode, pickup_board_token) values
-  (md5('shop:a')::uuid, 'Kopitiam Teras', 'kopitiam-teras', 'basic', 'first_order', null),
-  (md5('shop:b')::uuid, 'Restoran Contoh', 'restoran-contoh', 'pro', 'first_order', 'lapar-local-b-pickup-01');
+-- Staff codes (local only): Kopitiam Teras KTRS-7Q4M, Restoran Contoh RCTH-8W5N. Staff sign in with code + PIN.
+insert into public.shops (id, name, slug, plan_id, approval_mode, pickup_board_token, staff_code) values
+  (md5('shop:a')::uuid, 'Kopitiam Teras', 'kopitiam-teras', 'basic', 'first_order', null, 'KTRS7Q4M'),
+  (md5('shop:b')::uuid, 'Restoran Contoh', 'restoran-contoh', 'pro', 'first_order', 'lapar-local-b-pickup-01', 'RCTH8W5N');
 insert into public.shop_owners (shop_id, user_id) values
   (md5('shop:a')::uuid, md5('user:owner-a')::uuid), (md5('shop:b')::uuid, md5('user:owner-b')::uuid);
 

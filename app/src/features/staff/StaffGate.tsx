@@ -32,7 +32,7 @@ function PinGate() {
   }, [auth, session?.expiresAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return <Loading />;
-  if (!session) return <StaffPinForm onSubmit={async (slug, pin) => setSession(await auth.claimStaffSession(slug, pin))} />;
+  if (!session) return <StaffPinForm onSubmit={async (code, pin) => setSession(await auth.claimStaffSession(code, pin))} />;
   return (
     <>
       <div className="flex items-center justify-between gap-2 border-b border-stone-200 bg-white px-4 py-1">

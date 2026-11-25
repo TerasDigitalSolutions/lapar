@@ -134,6 +134,20 @@ test('Staff: PIN must be 4 to 6 digits', async () => {
   await waitFor(async () => expect((await d.owner.listStaff(SHOP)).some((s) => s.name === 'Aina')).toBe(true));
 });
 
+test('Staff: shows the staff code with WhatsApp share; a new code needs a confirm', async () => {
+  const d = setup();
+  open('Staff');
+  expect((await screen.findByTestId('staff-code')).textContent).toBe('KTRS-7Q4M');
+  expect(screen.getByText(/Anyone with the code and a PIN can open the staff screens/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Share on WhatsApp' }).getAttribute('href')).toContain('https://wa.me/?text=' + encodeURIComponent('Your Lapar staff code is KTRS-7Q4M'));
+  fireEvent.click(screen.getByRole('button', { name: 'New staff code' }));
+  expect(screen.getByText(/All staff devices will be signed out/)).toBeTruthy();
+  expect(await d.owner.getStaffCode(SHOP)).toBe('KTRS7Q4M'); // not changed until confirmed
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, make a new code' }));
+  await waitFor(async () => expect(await d.owner.getStaffCode(SHOP)).not.toBe('KTRS7Q4M'));
+  await waitFor(() => expect(screen.getByTestId('staff-code').textContent).not.toBe('KTRS-7Q4M'));
+});
+
 test('reportBounds: the window starts N-1 days back and unlimited has no start', () => {
   expect(reportBounds('2026-11-25', 30)).toEqual({ min: '2026-10-27', max: '2026-11-25' });
   expect(reportBounds('2026-11-25', 1)).toEqual({ min: '2026-11-25', max: '2026-11-25' });

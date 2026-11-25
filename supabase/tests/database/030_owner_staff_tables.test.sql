@@ -39,8 +39,8 @@ select throws_ok($$select public.set_staff_pin(md5('staff:a:ravi')::uuid, '4321'
 select throws_ok($$select public.set_staff_pin(md5('staff:a:ravi')::uuid, '88')$$, 'P0001', 'invalid_input', 'bad PIN');
 select throws_ok($$select public.set_staff_pin(md5('staff:b:siti')::uuid, '1357')$$, 'P0001', 'forbidden', 'owner A cannot reset a B PIN');
 select set_config('request.jwt.claims', json_build_object('sub', md5('user:device-a')::uuid, 'role', 'authenticated')::text, true);
-select is(public.claim_staff_session('kopitiam-teras', '8888') -> 'session' ->> 'staffName', 'Ravi K', 'the new PIN signs Ravi in');
-select is(public.claim_staff_session('kopitiam-teras', '5678') ->> 'error', 'invalid_pin', 'the old PIN no longer works');
+select is(public.claim_staff_session('KTRS-7Q4M', '8888') -> 'session' ->> 'staffName', 'Ravi K', 'the new PIN signs Ravi in');
+select is(public.claim_staff_session('KTRS-7Q4M', '5678') ->> 'error', 'invalid_pin', 'the old PIN no longer works');
 
 -- Nobody signed in, and an outsider
 select set_config('request.jwt.claims', '', true);

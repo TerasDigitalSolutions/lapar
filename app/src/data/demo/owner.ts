@@ -13,6 +13,7 @@ import type {
   Translations,
 } from '../types';
 import { resizeImage } from '../../lib/image';
+import { newStaffCode } from '../../lib/staffCode';
 import { getDailySummary } from './reports';
 import {
   assertShop,
@@ -325,7 +326,21 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
       const entry = s().staffPins.find((p) => p.staffId === row.id);
       if (entry) entry.pin = pin;
       else s().staffPins.push({ staffId: row.id, pin });
+      if (s().actorStaffId === row.id) s().actorStaffId = null; // its session ends
       ctx.emit();
+    },
+
+    async getStaffCode(shopId) {
+      assertShop(ctx, shopId);
+      return s().staffCode;
+    },
+
+    async regenerateStaffCode(shopId) {
+      assertShop(ctx, shopId);
+      s().staffCode = newStaffCode();
+      s().actorStaffId = null; // every staff session ends
+      ctx.emit();
+      return s().staffCode;
     },
 
     async getDailySummary(shopId, day) {

@@ -76,23 +76,42 @@ test('sold-out toggle updates the item', async () => {
   await waitFor(async () => expect((await d.staff.listSoldOutItems(SHOP)).find((i) => i.id === 'item-nasi-lemak')?.soldOut).toBe(true));
 });
 
-test('PIN form validates and maps errors', async () => {
-  const onSubmit = vi.fn().mockRejectedValue(new LaparError('invalid_pin'));
+test('PIN form validates, maps errors and remembers the staff code', async () => {
+  const onSubmit = vi.fn().mockRejectedValueOnce(new LaparError('not_found')).mockRejectedValueOnce(new LaparError('invalid_pin')).mockResolvedValue(undefined);
   render(<StaffPinForm onSubmit={onSubmit} />);
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  expect(screen.getByText('Enter the shop code.')).toBeTruthy();
+  expect(screen.getByText('Enter the staff code.')).toBeTruthy();
   expect(screen.getByText('The PIN is 4 to 6 digits.')).toBeTruthy();
   expect(onSubmit).not.toHaveBeenCalled();
 
-  fireEvent.change(screen.getByLabelText('Shop code'), { target: { value: 'kopitiam-teras' } });
+  fireEvent.change(screen.getByLabelText('Staff code'), { target: { value: 'ktrs-7q4m' } });
   for (const k of ['1', '2', '3']) fireEvent.click(screen.getByRole('button', { name: k }));
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   expect(onSubmit).not.toHaveBeenCalled(); // 3 digits is too short
 
   fireEvent.click(screen.getByRole('button', { name: '4' }));
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('kopitiam-teras', '1234'));
-  expect(await screen.findByText('That PIN is not right.')).toBeTruthy();
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('KTRS7Q4M', '1234'));
+  expect(await screen.findByText(/That staff code is not right/)).toBeTruthy(); // wrong code
+  expect(localStorage.getItem('lapar.staff.code')).toBeNull(); // not remembered
+
+  for (const k of '1234') fireEvent.click(screen.getByRole('button', { name: k }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  expect(await screen.findByText('That PIN is not right.')).toBeTruthy(); // wrong PIN
+
+  for (const k of '1234') fireEvent.click(screen.getByRole('button', { name: k }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  await waitFor(() => expect(localStorage.getItem('lapar.staff.code')).toBe('"KTRS7Q4M"'));
+});
+
+test('PIN form: a remembered staff code is prefilled and a lockout is explained', async () => {
+  localStorage.setItem('lapar.staff.code', JSON.stringify('KTRS7Q4M'));
+  const onSubmit = vi.fn().mockRejectedValue(new LaparError('pin_locked', '2026-11-25T10:00:00Z'));
+  render(<StaffPinForm onSubmit={onSubmit} />);
+  expect((screen.getByLabelText('Staff code') as HTMLInputElement).value).toBe('KTRS-7Q4M');
+  for (const k of '1234') fireEvent.click(screen.getByRole('button', { name: k }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  expect(await screen.findByText(/Too many wrong PINs/)).toBeTruthy();
 });
 
 test('set meal components are indented under their set line in approvals', async () => {

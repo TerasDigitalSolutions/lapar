@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Needs a freshly seeded database (`supabase db reset`). Throwaway seed values from supabase/seed.sql
-// (shop restoran-contoh, PIN 2468, owner-b@lapar.test). The customer phone polls every 10 s.
+// (staff code RCTH-8W5N, PIN 2468, owner-b@lapar.test). The customer phone polls every 10 s.
 const POLL = { timeout: 25_000 };
 const opts = { baseURL: 'http://localhost:5173', viewport: { width: 390, height: 844 } };
 
@@ -36,7 +36,7 @@ async function openKitchen(staff: Page) {
 
 async function staffSignIn(page: Page) {
   await page.goto('/lapar/#/staff');
-  await page.getByLabel('Shop code').fill('restoran-contoh');
+  await page.getByLabel('Staff code').fill('RCTH-8W5N');
   for (const d of '2468') await page.getByRole('button', { name: d, exact: true }).click();
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('tab', { name: /^Orders/ })).toBeVisible();

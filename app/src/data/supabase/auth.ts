@@ -53,11 +53,12 @@ export const authApi: AuthApi = {
     }
   },
 
-  async claimStaffSession(shopSlug, pin) {
+  async claimStaffSession(staffCode, pin) {
     if (!(await hasSession())) await auth((a) => a.signInAnonymously());
-    const res = await rpc<ClaimResult>('claim_staff_session', { p_shop_slug: shopSlug, p_pin: pin });
+    const res = await rpc<ClaimResult>('claim_staff_session', { p_staff_code: staffCode, p_pin: pin });
     if (res.ok) return res.session;
     // the RPC returns (never raises) a wrong PIN so the attempt counter is kept
+    if (res.error === 'invalid_code') throw new LaparError('not_found');
     throw new LaparError(res.error === 'pin_locked' ? 'pin_locked' : 'invalid_pin', res.error === 'pin_locked' ? res.lockedUntil : undefined);
   },
 

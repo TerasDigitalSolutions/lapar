@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Needs a freshly seeded database (`supabase db reset`): the first order of a tab waits for approval.
-// Throwaway seed values from supabase/seed.sql (shop kopitiam-teras, PIN 1234).
+// Throwaway seed values from supabase/seed.sql (staff code KTRS-7Q4M, PIN 1234).
 // The customer phone has no realtime; it polls every 10 s.
 const POLL = { timeout: 25_000 };
 
@@ -33,7 +33,7 @@ test('scan, order, approve, New to Served, pay and close the tab', async ({ brow
 
   // staff signs in and approves
   await staff.goto('/lapar/#/staff');
-  await staff.getByLabel('Shop code').fill('kopitiam-teras');
+  await staff.getByLabel('Staff code').fill('KTRS-7Q4M');
   for (const d of '1234') await staff.getByRole('button', { name: d, exact: true }).click();
   await staff.getByRole('button', { name: 'Sign in' }).click();
   await expect(staff.getByRole('tab', { name: /^Orders/ })).toBeVisible();

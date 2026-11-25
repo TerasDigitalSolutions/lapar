@@ -227,6 +227,9 @@ export const ownerApi: OwnerApi = {
     await rpc('set_staff_pin', { p_staff_id: staffId, p_pin: pin });
   },
 
+  getStaffCode: (shopId) => rpc<string>('get_staff_code', { p_shop_id: shopId }),
+  regenerateStaffCode: (shopId) => rpc<string>('regenerate_staff_code', { p_shop_id: shopId }),
+
   getDailySummary: (shopId, day) => rpc<DailySummaryDTO>('get_daily_summary', { p_shop_id: shopId, p_day: day }),
   getShopPlan: (shopId) => rpc<ShopPlanDTO>('get_shop_plan', { p_shop_id: shopId }),
 };

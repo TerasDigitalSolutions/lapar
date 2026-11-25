@@ -26,17 +26,17 @@ test('PIN path: shop code and PIN claim a session and open the staff screens', a
   let claimed: StaffSession | null = null;
   const claim = vi.fn<AuthApi['claimStaffSession']>(async () => (claimed = session));
   renderWith(fake({ getUser: async () => ({ id: 'a', email: null, isAnonymous: true }), getStaffSession: async () => claimed, claimStaffSession: claim }), <StaffGate />);
-  fireEvent.change(await screen.findByLabelText('Shop code'), { target: { value: 'Kopitiam' } });
+  fireEvent.change(await screen.findByLabelText('Staff code'), { target: { value: 'ktrs-7q4m' } });
   for (const d of '1234') fireEvent.click(screen.getByRole('button', { name: d }));
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   expect(await screen.findByRole('tab', { name: /Orders/ })).toBeTruthy();
-  expect(claim).toHaveBeenCalledWith('kopitiam', '1234');
+  expect(claim).toHaveBeenCalledWith('KTRS7Q4M', '1234');
   expect(screen.getByText('Signed in as Ravi')).toBeTruthy();
 });
 
 test('PIN path: an expired or forbidden session shows the PIN form', async () => {
   renderWith(fake({ getStaffSession: async () => Promise.reject(new LaparError('forbidden')) }), <StaffGate />);
-  expect(await screen.findByLabelText('Shop code')).toBeTruthy();
+  expect(await screen.findByLabelText('Staff code')).toBeTruthy();
 });
 
 test('owner path: wrong password shows an error, then sign in opens the manager', async () => {

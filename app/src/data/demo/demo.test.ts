@@ -324,21 +324,48 @@ describe('limits and staff', () => {
     await rejects(d.owner.resetStaffPin(ravi.id, '1234'), 'duplicate_pin');
     await d.owner.resetStaffPin(ravi.id, '5678'); // own PIN is fine
     await d.owner.resetStaffPin(ravi.id, '4321');
-    expect((await d.auth.claimStaffSession('kopitiam-teras', '4321')).staffName).toBe('Ravi');
+    expect((await d.auth.claimStaffSession('KTRS-7Q4M', '4321')).staffName).toBe('Ravi');
   });
 
   it('claims a staff session, then locks the shop after 5 wrong PINs for 10 minutes', async () => {
     const d = make();
     expect(await d.auth.getUser()).toMatchObject({ isAnonymous: false });
-    expect((await d.auth.claimStaffSession('kopitiam-teras', '1234')).staffName).toBe('Aminah');
+    expect((await d.auth.claimStaffSession('KTRS-7Q4M', '1234')).staffName).toBe('Aminah');
+    await rejects(d.auth.claimStaffSession('kopitiam-teras', '1234'), 'not_found'); // the public slug is not a code
     await rejects(d.auth.claimStaffSession('nowhere', '1234'), 'not_found');
-    for (let i = 0; i < 4; i++) await rejects(d.auth.claimStaffSession('kopitiam-teras', '0000'), 'invalid_pin');
-    await rejects(d.auth.claimStaffSession('kopitiam-teras', '0000'), 'pin_locked');
-    await rejects(d.auth.claimStaffSession('kopitiam-teras', '1234'), 'pin_locked'); // right PIN is refused too
+    expect((await d.auth.claimStaffSession(' ktrs7q4m ', '1234')).staffName).toBe('Aminah'); // case, dash and spaces ignored
+    for (let i = 0; i < 4; i++) await rejects(d.auth.claimStaffSession('KTRS-7Q4M', '0000'), 'invalid_pin');
+    await rejects(d.auth.claimStaffSession('KTRS-7Q4M', '0000'), 'pin_locked');
+    await rejects(d.auth.claimStaffSession('KTRS-7Q4M', '1234'), 'pin_locked'); // right PIN is refused too
     advance(10 * 60_000 + 1000);
-    expect((await d.auth.claimStaffSession('kopitiam-teras', '5678')).staffName).toBe('Ravi');
+    expect((await d.auth.claimStaffSession('KTRS-7Q4M', '5678')).staffName).toBe('Ravi');
     // approvals are recorded for the signed-in staff member
     expect((await d.auth.getStaffSession())?.staffId).toBe('staff-ravi');
+  });
+
+  it('an unknown staff code counts no failure; the lock needs the real code', async () => {
+    const d = make();
+    for (let i = 0; i < 8; i++) await rejects(d.auth.claimStaffSession('ZZZZ-ZZZZ', '0000'), 'not_found');
+    expect((await d.auth.claimStaffSession('KTRS-7Q4M', '1234')).staffName).toBe('Aminah');
+  });
+
+  it('shows the staff code to the owner; a new code ends staff sessions and retires the old code', async () => {
+    const d = make();
+    expect(await d.owner.getStaffCode(SHOP)).toBe('KTRS7Q4M');
+    await d.auth.claimStaffSession('KTRS-7Q4M', '1234');
+    const next = await d.owner.regenerateStaffCode(SHOP);
+    expect(next).toMatch(/^[A-HJ-KM-NP-Z2-9]{8}$/);
+    expect(next).not.toBe('KTRS7Q4M');
+    expect(await d.auth.getStaffSession()).toBeNull();
+    await rejects(d.auth.claimStaffSession('KTRS-7Q4M', '1234'), 'not_found');
+    expect((await d.auth.claimStaffSession(next, '1234')).staffName).toBe('Aminah');
+  });
+
+  it('resetting a PIN ends that person\'s session', async () => {
+    const d = make();
+    await d.auth.claimStaffSession('KTRS-7Q4M', '1234');
+    await d.owner.resetStaffPin('staff-aminah', '9999');
+    expect(await d.auth.getStaffSession()).toBeNull();
   });
 });
 

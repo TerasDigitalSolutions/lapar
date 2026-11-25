@@ -1,13 +1,59 @@
 import { useState } from 'react';
 import { useData } from '../../data/context';
 import { isLaparError, type StaffRow } from '../../data/types';
-import { Button, EmptyState, ErrorState, Field, inputClass, LimitBadge, Loading, Sheet } from '../../ui';
+import { formatStaffCode } from '../../lib/staffCode';
+import { Button, ConfirmDialog, EmptyState, ErrorState, Field, inputClass, LimitBadge, Loading, Sheet, useToast } from '../../ui';
 import { useAct, useLoad } from './hooks';
 import { useManagerT } from './messages';
 import { Card, Heading, Tag } from './parts';
 
 const PIN = /^\d{4,6}$/;
 const NAME_MAX = 40;
+
+/** The secret staff code: staff sign in with it plus their PIN. */
+function StaffCodeCard({ shopId }: { shopId: string }) {
+  const t = useManagerT();
+  const api = useData();
+  const toast = useToast();
+  const { run, busy } = useAct();
+  const code = useLoad(() => api.owner.getStaffCode(shopId), shopId);
+  const [confirming, setConfirming] = useState(false);
+  if (!code.data) return code.error ? <ErrorState error={code.error} onRetry={code.reload} /> : <Loading />;
+  const shown = formatStaffCode(code.data);
+  const copy = () =>
+    navigator.clipboard.writeText(shown).then(
+      () => toast(t('staff_code_copied'), 'success'),
+      () => toast(t('staff_code_copy_failed'), 'error'),
+    );
+  const renew = async () => {
+    if (await run(() => api.owner.regenerateStaffCode(shopId), t('staff_code_changed'))) {
+      setConfirming(false);
+      code.reload();
+    }
+  };
+  return (
+    <Card className="flex flex-col gap-3">
+      <h3 className="text-lg font-bold text-stone-900">{t('staff_code_title')}</h3>
+      <p className="text-stone-700">{t('staff_code_help')}</p>
+      <p data-testid="staff-code" className="text-3xl font-bold tracking-widest text-stone-900">{shown}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => void copy()}>{t('staff_code_copy')}</Button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(t('staff_code_share', { code: shown }))}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-stone-300 bg-white px-5 text-base font-semibold text-stone-900 hover:bg-stone-50"
+        >
+          {t('staff_code_whatsapp')}
+        </a>
+        <Button variant="ghost" onClick={() => setConfirming(true)}>{t('staff_code_new')}</Button>
+      </div>
+      <ConfirmDialog open={confirming} title={t('staff_code_confirm_title')} confirmLabel={t('staff_code_confirm')} danger busy={busy} onConfirm={() => void renew()} onCancel={() => setConfirming(false)}>
+        {t('staff_code_confirm_body')}
+      </ConfirmDialog>
+    </Card>
+  );
+}
 
 export function StaffSection({ shopId }: { shopId: string }) {
   const t = useManagerT();
@@ -49,6 +95,7 @@ export function StaffSection({ shopId }: { shopId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <Heading aside={<LimitBadge used={activeCount} limitKey="max_staff" />}>{t('staff_title')}</Heading>
+      <StaffCodeCard shopId={shopId} />
       <Card>
         <form
           className="flex flex-col gap-3"

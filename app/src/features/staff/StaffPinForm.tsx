@@ -1,15 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { Banner, Button, Field, inputClass } from '../../ui';
 import { isLaparError } from '../../data/types';
+import { formatStaffCode, normalizeStaffCode } from '../../lib/staffCode';
 import { readJson, writeJson } from '../../lib/storage';
 import { useStaffT } from './messages';
 
-const SHOP_KEY = 'lapar.staff.shop';
+const CODE_KEY = 'lapar.staff.code';
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-export function StaffPinForm({ onSubmit }: { onSubmit: (shopSlug: string, pin: string) => void | Promise<unknown> }) {
+export function StaffPinForm({ onSubmit }: { onSubmit: (staffCode: string, pin: string) => void | Promise<unknown> }) {
   const t = useStaffT();
-  const [shop, setShop] = useState(() => readJson<string>(SHOP_KEY, ''));
+  const [shop, setShop] = useState(() => formatStaffCode(readJson<string>(CODE_KEY, '')));
   const [pin, setPin] = useState('');
   const [shopError, setShopError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,24 +20,27 @@ export function StaffPinForm({ onSubmit }: { onSubmit: (shopSlug: string, pin: s
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const slug = shop.trim().toLowerCase();
-    setShopError(slug ? null : t('pin_shop_required'));
+    const code = normalizeStaffCode(shop);
+    setShopError(code.length === 8 ? null : t(code ? 'pin_not_found' : 'pin_shop_required'));
     const badPin = !/^\d{4,6}$/.test(pin);
     setError(badPin ? t('pin_len') : null);
-    if (!slug || badPin) return;
-    writeJson(SHOP_KEY, slug);
+    if (code.length !== 8 || badPin) return;
     setBusy(true);
     try {
-      await onSubmit(slug, pin);
+      await onSubmit(code, pin);
+      writeJson(CODE_KEY, code); // remembered only once it worked
     } catch (err) {
       setPin('');
+      if (isLaparError(err, 'not_found')) {
+        setShopError(t('pin_not_found'));
+        return;
+      }
       if (isLaparError(err, 'invalid_pin')) setError(t('pin_wrong'));
       else if (isLaparError(err, 'pin_locked')) {
         const until = err.detail ? new Date(err.detail) : null;
         const time = until && !isNaN(until.getTime()) ? until.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' }) : '';
         setError(t('pin_locked', { time }));
-      } else if (isLaparError(err, 'not_found')) setShopError(t('pin_not_found'));
-      else setError(t('pin_failed'));
+      } else setError(t('pin_failed'));
     } finally {
       setBusy(false);
     }
@@ -47,7 +51,7 @@ export function StaffPinForm({ onSubmit }: { onSubmit: (shopSlug: string, pin: s
     <form onSubmit={(e) => void submit(e)} className="mx-auto flex max-w-sm flex-col gap-5 p-6" noValidate>
       <h1 className="text-2xl font-bold text-stone-900">{t('pin_title')}</h1>
       <Field label={t('pin_shop')} hint={t('pin_shop_hint')} error={shopError}>
-        {(p) => <input {...p} className={inputClass} value={shop} autoCapitalize="none" autoCorrect="off" onChange={(e) => setShop(e.target.value)} />}
+        {(p) => <input {...p} className={inputClass} value={shop} autoCapitalize="characters" autoCorrect="off" onChange={(e) => setShop(e.target.value)} />}
       </Field>
       <div className="flex flex-col gap-2">
         <span className="text-base font-semibold text-stone-800">{t('pin_pin')}</span>

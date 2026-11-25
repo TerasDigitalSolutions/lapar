@@ -166,6 +166,19 @@ const en = {
   new_pin: 'New PIN',
   pin_changed: 'PIN changed',
 
+  staff_code_title: 'Staff code',
+  staff_code_help: 'Give this to your staff. Anyone with the code and a PIN can open the staff screens.',
+  staff_code_copy: 'Copy',
+  staff_code_copied: 'Staff code copied',
+  staff_code_copy_failed: 'Could not copy. Select the code and copy it by hand.',
+  staff_code_whatsapp: 'Share on WhatsApp',
+  staff_code_share: 'Your Lapar staff code is {code}. Open the staff screen, type this code once, then your PIN.',
+  staff_code_new: 'New staff code',
+  staff_code_confirm_title: 'Make a new staff code?',
+  staff_code_confirm_body: 'All staff devices will be signed out straight away. Staff need the new code and their PIN to sign in again. Only do this if the old code was shared or lost.',
+  staff_code_confirm: 'Yes, make a new code',
+  staff_code_changed: 'New staff code made. Share it with your staff.',
+
   // settings
   settings_title: 'Settings',
   shop_name: 'Shop name',

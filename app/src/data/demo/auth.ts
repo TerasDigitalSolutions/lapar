@@ -1,5 +1,6 @@
 /** Auth API for the demo: the owner is always signed in; staff PINs are checked against the seed (DATA-MODEL 6.2). */
 import type { AuthApi, StaffSession } from '../types';
+import { normalizeStaffCode } from '../../lib/staffCode';
 import { fail, gate, has, type Ctx } from './util';
 
 const LOCK_MS = 10 * 60_000;
@@ -40,9 +41,9 @@ export function createAuthApi(ctx: Ctx): AuthApi {
       return id ? sessionFor(id) : null;
     },
 
-    async claimStaffSession(shopSlug, pin) {
+    async claimStaffSession(staffCode, pin) {
       const s = ctx.s;
-      if (shopSlug !== s.shop.slug) fail('not_found');
+      if (normalizeStaffCode(staffCode) !== s.staffCode) fail('not_found');
       gate(ctx, 'staff_pins');
       const attempts = s.pinAttempts;
       const now = ctx.now().getTime();

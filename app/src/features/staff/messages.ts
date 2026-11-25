@@ -46,10 +46,10 @@ export const useStaffT = defineMessages<Key>('staff', {
     split_items_hint: 'Tick what this person is paying for.', split_people: 'People', split_share: 'Share for one of {n} still to pay',
     soldout_hint: 'Switch on what has run out. Customers will not be able to order it.', soldout_empty: 'No dishes yet.',
     soldout_on: 'Sold out',
-    pin_title: 'Staff sign in', pin_shop: 'Shop code', pin_shop_hint: 'Ask the owner if you do not know it',
+    pin_title: 'Staff sign in', pin_shop: 'Staff code', pin_shop_hint: 'The owner gives you this code. You only type it once on this device.',
     pin_pin: 'PIN', pin_digits: '{n} digits entered', pin_backspace: 'Delete last digit', pin_submit: 'Sign in',
-    pin_shop_required: 'Enter the shop code.', pin_len: 'The PIN is 4 to 6 digits.',
+    pin_shop_required: 'Enter the staff code.', pin_len: 'The PIN is 4 to 6 digits.',
     pin_wrong: 'That PIN is not right.', pin_locked: 'Too many wrong PINs. Try again at {time}.',
-    pin_not_found: 'No shop with that code.', pin_failed: 'Could not sign in. Check your connection and try again.',
+    pin_not_found: 'That staff code is not right. Ask the owner for the current code.', pin_failed: 'Could not sign in. Check your connection and try again.',
   },
 });
