@@ -1,10 +1,14 @@
-export default function Placeholder() {
+import { useParams } from 'react-router';
+import { DataProvider } from '../../data/context';
+import { getSupabaseData } from '../../data/supabase';
+import { CustomerView } from './CustomerView';
+
+export default function CustomerRoute() {
+  const { token = '' } = useParams();
+  // No `live`: the real customer page polls get_tab and never loads supabase-js.
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-xl font-bold">Customer — coming soon</h1>
-      <a href="#/" className="mt-4 inline-flex min-h-12 items-center underline">
-        Back
-      </a>
-    </main>
+    <DataProvider value={getSupabaseData()}>
+      <CustomerView tableToken={token} />
+    </DataProvider>
   );
 }
