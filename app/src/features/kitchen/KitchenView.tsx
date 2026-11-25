@@ -199,10 +199,11 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
                       {line.options.length > 0 && <span className="block text-xl font-semibold">{line.options.map((o) => o.name).join(', ')}</span>}
                       {line.parentName && <span className="block text-lg">{t('from_set', { name: line.parentName })}</span>}
                       {line.note && <span className="mt-1 block rounded bg-black/15 px-2 py-1 text-xl font-bold">{line.note}</span>}
-                      <span className="mt-2 flex items-baseline gap-x-3 whitespace-nowrap text-lg font-bold">
-                        <span className="text-xl">{label}</span>
-                        <span>{t('position', { n: line.position, total: line.positionOf })}</span>
-                        <span>{t('minutes', { n: mins })}</span>
+                      {/* Each part stays whole; the line wraps between parts in narrow tablet columns. */}
+                      <span className="mt-2 flex flex-wrap items-baseline gap-x-3 text-lg font-bold">
+                        <span className="whitespace-nowrap text-xl">{label}</span>
+                        <span className="whitespace-nowrap">{t('position', { n: line.position, total: line.positionOf })}</span>
+                        <span className="whitespace-nowrap">{t('minutes', { n: mins })}</span>
                       </span>
                     </button>
                     <IconButton label={t('menu_open', { name: line.name })} onClick={() => setMenuFor(line)} className="absolute right-1 top-1 size-12 text-2xl text-inherit">
