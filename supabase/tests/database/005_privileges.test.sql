@@ -48,15 +48,20 @@ select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.prona
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')
              and (p.proname in ('entitlements_of', 'limit_of', 'within_limit', 'default_station', 'current_staff_id',
                   'assert_member', 'assert_owner', 'assert_admin', 'assert_feature', 'next_pickup_no', 'tab_money',
-                  'assert_report_window', 'refresh_auto_pairings', 'myt_today', 'in_window', 'round_cash', 'best_promo')
+                  'assert_report_window', 'refresh_auto_pairings', 'myt_today', 'in_window', 'round_cash', 'best_promo',
+                  'staff_session_json', 'staff_lines_of', 'board_lines', 'tab_summary')
                   or p.proname like 'trg\_%')), 0::bigint,
   'authenticated cannot execute internal helpers or trigger functions');
 select is((select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['admin_clear_override', 'admin_create_shop', 'admin_get_platform_settings', 'admin_list_shops',
-        'admin_set_override', 'admin_set_plan', 'admin_set_platform_settings', 'admin_set_shop_active',
-        'call_server', 'current_shop_ids', 'get_entitlements', 'get_menu', 'get_pickup_board', 'get_tab',
-        'has_feature', 'is_member', 'is_owner', 'is_platform_admin', 'new_token', 'place_order', 'try_uuid'],
+  array['acknowledge_request', 'admin_clear_override', 'admin_create_shop', 'admin_get_platform_settings',
+        'admin_list_shops', 'admin_set_override', 'admin_set_plan', 'admin_set_platform_settings',
+        'admin_set_shop_active', 'advance_item', 'approve_order', 'call_server', 'claim_staff_session',
+        'complete_request', 'current_shop_ids', 'end_staff_session', 'get_board', 'get_entitlements', 'get_menu',
+        'get_pending_orders', 'get_pickup_board', 'get_ready_lines', 'get_service_requests', 'get_sold_out_items',
+        'get_stations', 'get_tab', 'get_tab_detail', 'get_tables_overview', 'has_feature', 'is_member', 'is_owner',
+        'is_platform_admin', 'my_shops', 'my_staff_session', 'new_token', 'place_order', 'record_payment',
+        'reject_order', 'set_item_sold_out', 'try_uuid'],
   'authenticated executes exactly the granted helpers (grows with later migrations)');
 
 -- Behaviour as a signed-in owner
