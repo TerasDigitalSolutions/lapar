@@ -1,6 +1,6 @@
 /** Auth API for the demo: the owner is always signed in; staff PINs are checked against the seed (DATA-MODEL 6.2). */
 import type { AuthApi, StaffSession } from '../types';
-import { fail, gate, type Ctx } from './util';
+import { fail, gate, has, type Ctx } from './util';
 
 const LOCK_MS = 10 * 60_000;
 const SESSION_MS = 16 * 3600_000;
@@ -11,7 +11,15 @@ export function createAuthApi(ctx: Ctx): AuthApi {
     const s = ctx.s;
     const member = s.staff.find((m) => m.id === staffId && m.active);
     return member
-      ? { shopId: s.shop.id, shopName: s.shop.name, shopSlug: s.shop.slug, staffId: member.id, staffName: member.name, expiresAt: new Date(ctx.now().getTime() + SESSION_MS).toISOString() }
+      ? {
+          shopId: s.shop.id,
+          shopName: s.shop.name,
+          shopSlug: s.shop.slug,
+          staffId: member.id,
+          staffName: member.name,
+          expiresAt: new Date(ctx.now().getTime() + SESSION_MS).toISOString(),
+          pickupBoardToken: has(ctx, 'takeaway') ? (s.shop.pickupBoardToken ?? null) : null,
+        }
       : null;
   };
 

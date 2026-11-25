@@ -354,6 +354,8 @@ export interface StaffSession {
   staffId: Uuid;
   staffName: string;
   expiresAt: IsoDateTime;
+  /** The shop's pickup board token when it has `takeaway`, else null (staff pickup-board overlay). */
+  pickupBoardToken: string | null;
 }
 
 /** RPC my_shops: shops where the signed-in user is an owner. */
