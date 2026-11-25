@@ -5,7 +5,7 @@
 import { PLAN_DEFAULTS, resolveEntitlements } from '../../entitlements/keys';
 import { readJson, removeKey, writeJson } from '../../lib/storage';
 import { mytToday } from '../../lib/time';
-import type { LaparDemoData } from '../types';
+import type { LaparDemoData, ShopChange } from '../types';
 import { createAdminApi } from './admin';
 import { createAuthApi } from './auth';
 import { createCustomerApi } from './customer';
@@ -41,6 +41,9 @@ function isolate<T extends object>(api: T): T {
   return out as T;
 }
 
+/** A bare emit means "something changed": one synthetic UPDATE per table so every useLiveQuery reloads now. */
+const allTables = (): ShopChange[] => (['orders', 'order_items', 'service_requests', 'tabs'] as const).map((table) => ({ table, event: 'UPDATE', id: 'demo' }));
+
 export function createDemoData({ persist = true, now = () => new Date(), history = true }: DemoOptions = {}): LaparDemoData {
   const emitter = createEmitter();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -70,7 +73,7 @@ export function createDemoData({ persist = true, now = () => new Date(), history
         clearTimeout(timer);
         timer = setTimeout(() => writeJson(STORAGE_KEY, withoutHistory(ctx.s)), SAVE_DEBOUNCE_MS);
       }
-      emitter.emit(...changes);
+      emitter.emit(...(changes.length ? changes : allTables()));
     },
   };
 
@@ -117,7 +120,7 @@ export function createDemoData({ persist = true, now = () => new Date(), history
       clearTimeout(timer);
       removeKey(STORAGE_KEY);
       ctx.s = build(seedState(now().toISOString()));
-      emitter.emit(); // not ctx.emit(): that would save the seed again
+      emitter.emit(...allTables()); // not ctx.emit(): that would save the seed again
     },
     onChange: emitter.onChange,
   };

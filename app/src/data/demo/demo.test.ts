@@ -277,6 +277,25 @@ describe('payments', () => {
 });
 
 describe('limits and staff', () => {
+  it('a plan switch and a sold-out toggle notify subscribers at once', async () => {
+    const d = make();
+    const seen: string[] = [];
+    d.subscribeShop(SHOP, (c) => seen.push(`${c.table}:${c.event}`));
+    d.setPlan('pro');
+    expect(seen).toContain('orders:UPDATE');
+    expect(seen).toContain('tabs:UPDATE');
+    seen.length = 0;
+    await d.staff.setSoldOut('item-nasi-lemak', true);
+    expect(seen).toContain('order_items:UPDATE');
+  });
+
+  it('reports 1 station on Basic and the real count on Pro', async () => {
+    const d = make();
+    expect((await d.owner.getShopPlan(SHOP)).usage.stations).toBe(1);
+    d.setPlan('pro');
+    expect((await d.owner.getShopPlan(SHOP)).usage.stations).toBe(2);
+  });
+
   it('Basic allows 15 tables and 3 staff', async () => {
     const d = make();
     for (let i = 11; i <= 15; i++) await d.owner.saveTable({ shopId: SHOP, label: `Table ${i}` });
@@ -284,7 +303,7 @@ describe('limits and staff', () => {
     await rejects(d.owner.saveTable({ shopId: SHOP, label: 'table 15' }), 'invalid_input', 'label');
     await rejects(d.owner.saveTable({ shopId: SHOP, label: 'Bar', kind: 'counter' }), 'feature_not_enabled', 'takeaway');
     const plan = await d.owner.getShopPlan(SHOP);
-    expect(plan.usage).toEqual({ tables: 15, stations: 2, staff: 2 });
+    expect(plan.usage).toEqual({ tables: 15, stations: 1, staff: 2 });
 
     await d.owner.addStaff(SHOP, 'Siti', '2468');
     await rejects(d.owner.addStaff(SHOP, 'Four', '1357'), 'limit_reached', 'max_staff');

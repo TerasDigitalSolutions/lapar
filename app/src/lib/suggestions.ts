@@ -8,10 +8,11 @@ export function pickSuggestions(args: {
   cartItemIds: ReadonlySet<Uuid> | readonly Uuid[];
 }): MenuItem[] {
   const inCart = new Set(args.cartItemIds);
+  const parts = new Set(args.item.combo?.components.map((c) => c.itemId));
   const out: MenuItem[] = [];
   for (const { itemId } of args.item.suggestions) {
     const s = args.itemsById.get(itemId);
-    if (!s || s.id === args.item.id || s.soldOut || inCart.has(s.id)) continue;
+    if (!s || s.id === args.item.id || s.soldOut || inCart.has(s.id) || parts.has(s.id)) continue;
     if (args.categoriesById.get(s.categoryId)?.availableNow === false) continue;
     if (out.some((o) => o.id === s.id)) continue;
     out.push(s);

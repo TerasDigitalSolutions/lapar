@@ -19,3 +19,13 @@ test('skips missing, sold out, closed category, in cart and self; caps at 3', ()
   });
   expect(res.map((i) => i.id)).toEqual(['a', 'b', 'c']);
 });
+
+test('skips components of the combo being added', () => {
+  const combo = item('set', {
+    combo: { components: [{ itemId: 'teh', name: 'teh', translations: {}, qty: 1 }] },
+    suggestions: ['teh', 'a'].map((itemId) => ({ itemId, source: 'manual' as const })),
+  });
+  const all = [combo, item('teh'), item('a')];
+  const res = pickSuggestions({ item: combo, itemsById: new Map(all.map((i) => [i.id, i])), categoriesById: new Map([cat('c1')].map((c) => [c.id, c])), cartItemIds: [] });
+  expect(res.map((i) => i.id)).toEqual(['a']);
+});

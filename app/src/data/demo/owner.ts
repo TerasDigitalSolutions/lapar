@@ -339,7 +339,7 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
       return {
         planId: st.plan,
         entitlements: entitlements(ctx),
-        usage: { tables: activeTables(), stations: activeCount(st.stations), staff: activeCount(st.staff) },
+        usage: { tables: activeTables(), stations: entitlements(ctx).features.multi_station ? activeCount(st.stations) : 1, staff: activeCount(st.staff) },
         askTerasWhatsapp: null,
       };
     },
