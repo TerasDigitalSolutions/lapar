@@ -28,9 +28,10 @@ export function bestPromo<P extends PromoRule>(
   return best;
 }
 
-/** Today's (MYT) end time of the promo window; the next day when the window wraps past midnight. */
+/** Today's (MYT) end time of the promo window; the next day when it wraps midnight and `at` is not yet past midnight. */
 export function promoEndsAt(promo: Pick<PromoRow, 'startTime' | 'endTime'>, at: Date): IsoDateTime {
-  const today = mytParts(at).date;
-  const day = promo.endTime < promo.startTime ? addDays(today, 1) : today;
+  const { date: today, hour, minute } = mytParts(at);
+  const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const day = promo.endTime < promo.startTime && time >= promo.endTime ? addDays(today, 1) : today;
   return new Date(`${day}T${promo.endTime}:00+08:00`).toISOString();
 }

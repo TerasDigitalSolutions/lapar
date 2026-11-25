@@ -13,9 +13,20 @@ select throws_ok($$select public.call_server('lapar-local-a-table-01', 'bill', r
 -- First tap, then a merge
 insert into _r select 't1', public.call_server('lapar-local-a-table-01', 'bill');
 select is(r ->> 'tapCount', '1', 'first tap: tapCount 1') from _r where k = 't1';
+-- Taps within 10 s are ignored (migration 0800); make the last tap 11 s old so the next one counts.
+reset role;
+alter table public.service_requests disable trigger touch_updated_at;
+update public.service_requests set updated_at = updated_at - interval '11 seconds' where true;
+alter table public.service_requests enable trigger touch_updated_at;
+set local role anon;
 insert into _r select 't2', public.call_server('lapar-local-a-table-01', 'bill', '  cash please  ');
 select is((select r ->> 'tapCount' from _r where k = 't2'), '2', 'second tap merges: tapCount 2');
 select is((select r ->> 'requestId' from _r where k = 't2'), (select r ->> 'requestId' from _r where k = 't1'), 'second tap is the same request');
+reset role;
+alter table public.service_requests disable trigger touch_updated_at;
+update public.service_requests set updated_at = updated_at - interval '11 seconds' where true;
+alter table public.service_requests enable trigger touch_updated_at;
+set local role anon;
 insert into _r select 't3', public.call_server('lapar-local-a-table-01', 'bill', '   ');
 select is((select r ->> 'tapCount' from _r where k = 't3'), '3', 'blank note still counts as a tap');
 

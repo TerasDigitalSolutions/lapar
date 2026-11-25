@@ -6,7 +6,7 @@ const promo = (p: Partial<PromoRow>): PromoRow => ({
   id: 'p1', shopId: 's', name: 'Happy', translations: {}, discountType: 'percent', discountValue: 20,
   days: [1, 2, 3, 4, 5, 6, 7], startTime: '14:00', endTime: '17:00', active: true, itemIds: ['i1'], ...p,
 });
-const at = (hhmm: string) => new Date(`2026-11-25T${hhmm}:00+08:00`); // a Wednesday
+const at = (hhmm: string, day = '2026-11-25') => new Date(`${day}T${hhmm}:00+08:00`); // 25 Nov 2026 is a Wednesday
 
 describe('promoPrice', () => {
   it('rounds percent half up', () => {
@@ -39,5 +39,9 @@ describe('promoEndsAt', () => {
   it('is today at the end time, or tomorrow when the window wraps', () => {
     expect(promoEndsAt(promo({}), at('15:00'))).toBe('2026-11-25T09:00:00.000Z');
     expect(promoEndsAt(promo({ startTime: '22:00', endTime: '02:00' }), at('23:00'))).toBe('2026-11-25T18:00:00.000Z');
+  });
+  it('is today when an overnight window is past midnight', () => {
+    // 2026-11-26 01:00 MYT, window 22:00-02:00 ends 2026-11-26 02:00 MYT
+    expect(promoEndsAt(promo({ startTime: '22:00', endTime: '02:00' }), at('01:00', '2026-11-26'))).toBe('2026-11-25T18:00:00.000Z');
   });
 });

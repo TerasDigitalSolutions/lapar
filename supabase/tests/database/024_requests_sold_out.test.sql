@@ -10,6 +10,12 @@ insert into public.staff_sessions (auth_uid, shop_id, staff_id, expires_at) valu
 set local role anon;
 insert into _r select 'bill', public.call_server('lapar-local-a-table-01', 'bill', 'cash');
 insert into _r select 'water', public.call_server('lapar-local-a-table-02', 'water');
+-- Taps within 10 s are ignored (migration 0800); make the last tap 11 s old so the next one counts.
+reset role;
+alter table public.service_requests disable trigger touch_updated_at;
+update public.service_requests set updated_at = updated_at - interval '11 seconds' where true;
+alter table public.service_requests enable trigger touch_updated_at;
+set local role anon;
 insert into _r select 'water2', public.call_server('lapar-local-a-table-02', 'water');
 insert into _r select 'other', public.call_server('lapar-local-a-table-03', 'other', 'high chair');
 insert into _r select 'b_bill', public.call_server('lapar-local-b-table-01', 'bill');

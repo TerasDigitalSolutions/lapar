@@ -40,6 +40,9 @@ const RATE_WINDOW_MS = 5 * 60_000;
 const TABLE_RATE_LIMIT = 5;
 const COUNTER_RATE_LIMIT = 20;
 const DAY_MS = 86_400_000;
+const CALL_THROTTLE_MS = 10_000;
+// A table tab opened before today (MYT) is stale: customers no longer see it and the next order closes it.
+const isStale = (ctx: Ctx, tab: TabRow) => mytDayOf(tab.openedAt) < mytToday(ctx.now());
 
 export function createCustomerApi(ctx: Ctx): CustomerApi {
   const needTable = (token: string) => tableByToken(ctx.s, token) ?? fail('not_found');
@@ -171,6 +174,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         if (item.isCombo) {
           gate(ctx, 'combos');
           if (optionIds.length) fail('invalid_input', 'option_ids');
+          if (!s.comboComponents.some((c) => c.comboItemId === item.id && s.items.some((x) => x.id === c.itemId))) fail('item_unavailable', item.id);
         }
         if (features.timed_menus) {
           const window = s.categories.find((c) => c.id === item.categoryId)?.window;
@@ -209,6 +213,13 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
 
       const now = nowIso(ctx);
       let tab: TabRow | undefined = counter ? undefined : s.tabs.find((t) => t.tableId === table.id && t.status === 'open' && t.kind === 'table');
+      if (tab && isStale(ctx, tab)) {
+        tab.status = 'closed';
+        tab.closedAt = now;
+        tab.updatedAt = now;
+        ctx.emit(change('tabs', 'UPDATE', tab.id));
+        tab = undefined;
+      }
       const newTab = !tab;
       if (!tab) {
         let pickupNo: number | null = null;
@@ -300,7 +311,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         tab = s.tabs.find((t) => t.id === tabId && t.tableId === table.id);
         if (!tab || ctx.now().getTime() - new Date(tab.openedAt).getTime() > DAY_MS) fail('not_found');
       } else {
-        tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open'); // tables ignore the tab id
+        tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open' && !isStale(ctx, t)); // tables ignore the tab id
       }
       const orders: CustomerOrderDTO[] = tab
         ? ordersOfTab(s, tab.id)
@@ -326,6 +337,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       const clean = note == null ? null : text(note, 140, 'note', true) || null;
       const now = nowIso(ctx);
       const open = s.requests.find((r) => r.tableId === table.id && r.reason === reason && r.status !== 'done');
+      if (open && open.status === 'open' && ctx.now().getTime() - new Date(open.updatedAt).getTime() < CALL_THROTTLE_MS) return; // throttled
       if (open) {
         // A repeat tap re-opens an acknowledged call (DECISIONS D26).
         open.tapCount += 1;
@@ -335,7 +347,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         ctx.emit(change('service_requests', 'UPDATE', open.id));
         return;
       }
-      const tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open');
+      const tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open' && !isStale(ctx, t));
       const row = { id: ctx.id('request'), tableId: table.id, tabId: tab?.id ?? null, reason, note: clean, status: 'open' as const, tapCount: 1, createdAt: now, updatedAt: now, acknowledgedAt: null, doneAt: null };
       s.requests.push(row);
       ctx.emit(change('service_requests', 'INSERT', row.id));
@@ -350,7 +362,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       const preparing: number[] = [];
       const ready: number[] = [];
       for (const tab of s.tabs) {
-        if (tab.status !== 'open' || !counters.has(tab.tableId) || tab.pickupNo === null || mytDayOf(tab.openedAt) !== today) continue;
+        if (!counters.has(tab.tableId) || tab.pickupNo === null || mytDayOf(tab.openedAt) !== today) continue;
         const orders = ordersOfTab(s, tab.id).filter((o) => o.status === 'approved');
         if (!orders.length) continue;
         const lines = orders.flatMap((o) => linesOfOrder(s, o.id)).filter((l) => l.kind !== 'combo' && l.status !== 'cancelled');

@@ -228,6 +228,7 @@ describe('server calls', () => {
   it('merges taps, reopens an acknowledged call, and reports open requests', async () => {
     const d = make();
     await d.customer.callServer(T1, 'bill');
+    advance(11_000); // taps inside 10 seconds are throttled
     await d.customer.callServer(T1, 'bill', ' cash ');
     await d.customer.callServer(T1, 'water');
     let list = await d.staff.listServiceRequests(SHOP);
