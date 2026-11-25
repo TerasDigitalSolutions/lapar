@@ -53,7 +53,9 @@ select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.prona
   'authenticated cannot execute internal helpers or trigger functions');
 select is((select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['current_shop_ids', 'get_entitlements', 'has_feature', 'is_member', 'is_owner', 'is_platform_admin', 'new_token', 'try_uuid'],
+  array['admin_clear_override', 'admin_create_shop', 'admin_get_platform_settings', 'admin_list_shops',
+        'admin_set_override', 'admin_set_plan', 'admin_set_platform_settings', 'admin_set_shop_active',
+        'current_shop_ids', 'get_entitlements', 'has_feature', 'is_member', 'is_owner', 'is_platform_admin', 'new_token', 'try_uuid'],
   'authenticated executes exactly the granted helpers (grows with later migrations)');
 
 -- Behaviour as a signed-in owner
