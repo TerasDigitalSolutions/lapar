@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
   workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ''
 
 concurrency:
   group: pages
@@ -13,12 +17,16 @@ concurrency:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.ref }}
 
   build:
     needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: 22

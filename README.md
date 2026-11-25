@@ -36,3 +36,29 @@ supabase/           database project
 ## Deploys
 
 Pushes to `main` run `deploy.yml`: it calls `ci.yml` (typecheck, lint, unit tests, build, e2e), and only if that passes builds `dist/` and publishes it with GitHub Pages (source: GitHub Actions).
+
+## Operations
+
+`nightly.yml` runs at 19:15 UTC (03:15 Malaysia time) and by hand (Actions, Nightly, Run workflow). It moves new menu photos from Supabase Storage into `app/public/menu/`, commits them to `main`, deploys only if something changed, marks those photos published and deletes the staging copies, takes an encrypted database backup, and commits `.github/heartbeat` if `main` has been quiet for 30 days (GitHub disables scheduled workflows in public repos after 60 days without activity).
+
+Repository secrets (Settings, Secrets and variables, Actions). Until they exist the matching steps skip with a notice and the run still succeeds; once set, any failure fails the run and GitHub emails the owner.
+
+| Secret | Used by |
+| --- | --- |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | photo sync and publish |
+| `SUPABASE_DB_URL`, `AGE_PUBLIC_KEY`, `BACKUP_REPO_TOKEN` | backup (all three needed) |
+
+Repository variable `SUPABASE_PUBLIC_KEY` (publishable key) is used by the site build. `BACKUP_REPO_TOKEN` is a fine-grained token with contents write on the private repo `lapar-backups` only. If `main` is protected, allow the Actions bot to push.
+
+Backups are `lapar-YYYY-MM-DD.tar.gz.age` files (roles, schema and data dumps, encrypted with `age`); the newest 30 are kept in `lapar-backups`. Nothing unencrypted is ever written into a repo. To try it locally: `BACKUP_DRY_RUN=1 AGE_PUBLIC_KEY=<public key> SUPABASE_DB_URL=<url> scripts/backup.sh` writes the encrypted file to `BACKUP_OUT_DIR` (default `.`) and stops.
+
+Repo size: removed photos stay in history. At about 80 KB per photo that is fine for thousands; revisit if the repo passes about 500 MB.
+
+## Restore
+
+1. Download the newest `lapar-*.tar.gz.age` from `lapar-backups`.
+2. Decrypt and unpack with the private age key: `age -d -i key.txt lapar-YYYY-MM-DD.tar.gz.age | tar xz` (creates `dump/roles.sql`, `schema.sql`, `data.sql`).
+3. Create a fresh Supabase project with the same Postgres major version as `supabase/config.toml`, and take its database URL as `$DB`.
+4. Load in order: `psql "$DB" -f dump/roles.sql`, then `dump/schema.sql`, then `dump/data.sql`. Errors about objects that already exist in Supabase's own schemas are expected.
+5. Point the repo secrets and the `SUPABASE_PUBLIC_KEY` variable at the new project, update the project ref in `supabase-deploy.yml`, and re-run `supabase-deploy` so migrations and the edge function match. The dump covers the app's own schemas, not Supabase auth users: recreate your admin user (`docs/ARCHITECTURE.md`, section 13) and re-invite owners from `#/admin`.
+6. Menu photos live in the site repo (`app/public/menu/`), not in the backup; photos still in staging are not backed up.

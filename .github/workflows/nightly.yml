@@ -1,0 +1,156 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '15 19 * * *' # 03:15 Malaysia time
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  SITE_BASE: https://terasdigitalsolutions.github.io/lapar/
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      changed: ${{ steps.commit.outputs.changed || 'false' }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - id: gate
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -n "$URL" ] && [ -n "$KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Photo sync skipped: secrets SUPABASE_URL and SUPABASE_SECRET_KEY are not both set."
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - if: steps.gate.outputs.run == 'true'
+        run: pip install -r scripts/requirements.txt
+      - if: steps.gate.outputs.run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/photo_sync.py prepare
+      - id: commit
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          git add -A app/public/menu
+          if git diff --cached --quiet; then
+            echo "No photo changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git -c user.name=lapar-nightly -c user.email=actions@users.noreply.github.com commit -q -m "chore: sync menu photos"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.commit.outputs.changed == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: photo-manifest
+          path: photo-manifest.json
+
+  deploy:
+    needs: sync
+    if: needs.sync.outputs.changed == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ref: ${{ needs.sync.outputs.sha }}
+
+  publish:
+    needs: [sync, deploy]
+    if: needs.sync.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.sync.outputs.sha }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -r scripts/requirements.txt
+      - uses: actions/download-artifact@v5
+        with:
+          name: photo-manifest
+      - env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/photo_sync.py publish --site-base "$SITE_BASE"
+
+  backup:
+    needs: [sync, deploy, publish]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - id: gate
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          AGE: ${{ secrets.AGE_PUBLIC_KEY }}
+          TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          if [ -n "$DB" ] && [ -n "$AGE" ] && [ -n "$TOKEN" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Backup skipped: secrets SUPABASE_DB_URL, AGE_PUBLIC_KEY and BACKUP_REPO_TOKEN are not all set."
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+      - if: steps.gate.outputs.run == 'true'
+        run: sudo apt-get install -y age
+      - if: steps.gate.outputs.run == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: scripts/backup.sh
+
+  heartbeat:
+    needs: [sync, deploy, publish, backup]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      # GitHub disables scheduled workflows in a public repo after 60 days without commits.
+      - run: |
+          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+          if [ "$age" -gt $(( 30 * 86400 )) ]; then
+            date -u +%FT%TZ > .github/heartbeat
+            git add .github/heartbeat
+            git -c user.name=lapar-nightly -c user.email=actions@users.noreply.github.com commit -q -m "chore: heartbeat"
+            git push origin HEAD:main
+          else
+            echo "Recent commit found; no heartbeat needed."
+          fi
