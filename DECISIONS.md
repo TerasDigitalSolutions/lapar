@@ -63,6 +63,21 @@ Newest first within each section. Each entry: what was decided, why, and where i
 | D42 | Staging bucket: public, 2 MB per file, WebP and JPEG only. | Browser already resizes to ≤ 1200 px. | DATA-MODEL 9 |
 | D43 | Brief column renames/additions: `orders.approved_by` → `approved_by_staff_id` (null when an owner approves or the order needs no approval); new columns for Pro (`tables.kind`, `tabs.kind/pickup_no/pickup_at`, `items.is_combo`, `translations`, category windows, `order_items.kind/line_no/parent_line_id/list_price_sen/promo_id/column_id/ready_at/served_at/paid_payment_id`). | Staff approve from anonymous device users, so the staff id is the useful record. | DATA-MODEL 3 |
 
+## 2026-11-25 — Build decisions (orchestrator)
+
+| # | Decision | Why | Where |
+| --- | --- | --- | --- |
+| B1 | `StaffSession` carries `pickupBoardToken` (null without `takeaway`); staff bills and the pickup overlay read shop name and token from the staff session, owners fall back to shop settings. | Staff devices may not call owner RPCs. | `types.ts`, `my_staff_session` |
+| B2 | Every SQL `UPDATE`/`DELETE` has a `WHERE`; pgTAP 041 scans all function bodies for it. | PostgREST loads pg-safeupdate (error 21000); found when the admin could not save the WhatsApp number. | migration 0700, test 041 |
+| B3 | One Realtime channel per subscriber (`shop:<id>:<n>`). | supabase-js reuses a channel for a repeated topic; the second subscriber failed and the kitchen showed "No connection". | `data/supabase/realtime.ts` |
+| B4 | "Start shift" shows once per page load; the demo ignores `navigator.onLine`. | Remounts (view, plan, station switches) kept covering the staff tabs; the demo never uses the network. | `features/kitchen` |
+| B5 | Receipt print rules apply only while a receipt prints (`@page receipt`); the A4 QR sheet scopes its own rules. | The receipt CSS blanked the A4 QR sheet. | `features/print`, `QrPrint.tsx` |
+| B6 | The customer view takes an opt-in `live` prop; only the demo passes it. The real customer page polls every 10 s and never loads supabase-js. | Instant demo updates without growing the customer bundle. | `features/customer` |
+| B7 | Wrong owner password (Supabase `invalid_credentials`) maps to `invalid_input` / `credentials`. | It showed a generic error. | `data/supabase/errors.ts` |
+| B8 | Production auth: site URL and redirect allow-list = the github.io site, anonymous sign-ins on, OTP expiry 24 h, minimum password 8, email confirmation stays on (owners are created confirmed by the Edge Function). | Matches what is tested locally; strangers who sign up cannot confirm. | Supabase project settings |
+| B9 | The publishable key is the repo variable `SUPABASE_PUBLIC_KEY`; no secret is stored in GitHub yet. Migrations and the Edge Function were deployed from Eshan's Mac with the Teras CLI login. | Secrets are Eshan's to add (Q4). | ARCHITECTURE 13 |
+| B10 | The nightly and Supabase-deploy workflows skip with a notice until their secrets exist. | No failing run every night before setup. | `.github/workflows` |
+
 ## Open — needs Eshan
 
 | # | Question |
@@ -70,7 +85,7 @@ Newest first within each section. Each entry: what was decided, why, and where i
 | Q1 | Backup destination for shop backups (O4). Today: download to the device only. |
 | ~~Q2~~ | Resolved 2026-11-25: the hosted project runs Postgres 17.12, so `major_version = 17` is right. |
 | ~~Q3~~ | Resolved 2026-11-25: the project already has a default publishable key and a default secret key; nothing to create. |
-| Q4 | One-time setup in ARCHITECTURE section 13: anonymous sign-ins on, OTP expiry 24 h, GitHub secrets and variable, private `lapar-backups` repo and `age` key, first admin user, Pages source, branch protection that lets the Actions bot push. |
+| Q4 | One-time setup, partly done 2026-11-25: migrations and the Edge Function are deployed, auth settings applied (B8), Pages source and the `SUPABASE_PUBLIC_KEY` variable set. Still Eshan's: the first admin user, GitHub secrets (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`), and for backups the private `lapar-backups` repo, an `age` key and `BACKUP_REPO_TOKEN`. |
 | Q5 | Who reviews the Bahasa Malaysia and Chinese drafts (customer screens and seed menu translations), and when. |
 | Q6 | Demo photos: initials placeholders until real or licensed photos are supplied. |
 | Q7 | Per-shop PIN lockout lets anyone who knows the shop code lock staff out for 10 minutes. Keep (brief rule), or lock per device instead? |
