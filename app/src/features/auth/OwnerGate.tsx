@@ -34,7 +34,8 @@ export function OwnerGate({ children, signedOut }: { children: (shop: OwnerShopD
 
   const shop = state.shops.length === 1 ? state.shops[0] : state.shops.find((s) => s.id === shopId);
   const bar = (
-    <div className="flex items-center justify-end gap-2 border-b border-stone-200 bg-white px-3 py-1">
+    <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-3 py-1">
+      <p className="min-w-0 flex-1 truncate font-semibold text-stone-900">{shop?.name}</p>
       {state.shops.length > 1 && shop && (
         <Button variant="ghost" onClick={() => setShopId(null)}>
           {t('switch_shop')}
