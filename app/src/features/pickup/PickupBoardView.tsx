@@ -61,7 +61,7 @@ export function PickupBoardView({ boardToken }: { boardToken: string }) {
   );
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 bg-white p-4 text-stone-900">
+    <main data-board-token={boardToken} className="flex min-h-dvh flex-col gap-4 bg-white p-4 text-stone-900">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold md:text-5xl">{board.shopName}</h1>
         <div className="flex items-center gap-3">
