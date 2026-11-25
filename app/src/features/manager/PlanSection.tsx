@@ -1,4 +1,5 @@
 import { useData } from '../../data/context';
+import { useEntitlements } from '../../entitlements/hooks';
 import { FEATURE_KEYS, LIMIT_KEYS } from '../../entitlements/keys';
 import { entitlementLabel } from '../../entitlements/messages';
 import { ErrorState, focusRing, LimitBadge, Loading, ProLocked } from '../../ui';
@@ -11,7 +12,8 @@ const USAGE = { max_tables: 'tables', max_stations: 'stations', max_staff: 'staf
 export function PlanSection({ shopId }: { shopId: string }) {
   const t = useManagerT();
   const api = useData();
-  const q = useLoad(() => api.owner.getShopPlan(shopId), shopId);
+  const ent = useEntitlements();
+  const q = useLoad(() => api.owner.getShopPlan(shopId), `${shopId}:${JSON.stringify(ent)}`);
   if (!q.data) return q.error ? <ErrorState error={q.error} onRetry={q.reload} /> : <Loading />;
   const plan = q.data;
   const number = plan.askTerasWhatsapp?.replace(/\D/g, '') || null;
@@ -32,8 +34,14 @@ export function PlanSection({ shopId }: { shopId: string }) {
             <li key={k} className="flex min-h-12 items-center justify-between gap-3">
               <span className="text-stone-900">{entitlementLabel(k)}</span>
               <span className="flex items-center gap-2">
-                <span className="tabular-nums text-stone-700">{plan.usage[USAGE[k as keyof typeof USAGE]]}</span>
-                {plan.entitlements.limits[k] === null ? <span className="text-sm text-stone-600">{t('unlimited')}</span> : <LimitBadge used={plan.usage[USAGE[k as keyof typeof USAGE]]} limitKey={k} />}
+                {plan.entitlements.limits[k] === null ? (
+                  <>
+                    <span className="tabular-nums text-stone-700">{plan.usage[USAGE[k as keyof typeof USAGE]]}</span>
+                    <span className="text-sm text-stone-600">{t('unlimited')}</span>
+                  </>
+                ) : (
+                  <LimitBadge used={plan.usage[USAGE[k as keyof typeof USAGE]]} limitKey={k} />
+                )}
               </span>
             </li>
           ))}

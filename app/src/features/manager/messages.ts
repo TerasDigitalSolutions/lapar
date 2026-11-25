@@ -51,6 +51,7 @@ const en = {
   sales: 'Sales',
   orders: 'Orders',
   average_bill: 'Average bill ({bills} bills)',
+  average_bill_one: 'Average bill (1 bill)',
   top_items: 'Top 5 dishes',
   no_sales: 'No sales on this day.',
   sold_qty: '{n} sold',

@@ -10,6 +10,8 @@ describe('money', () => {
   it('formats and parses', () => {
     expect(formatRM(1230)).toBe('RM 12.30');
     expect(formatRM(5)).toBe('RM 0.05');
+  expect(formatRM(737350)).toBe('RM 7,373.50');
+  expect(formatRM(100000000)).toBe('RM 1,000,000.00');
     expect(formatRM(-5)).toBe('-RM 0.05');
     expect(parseRM('12.3')).toBe(1230);
     expect(parseRM('RM 12.30')).toBe(1230);

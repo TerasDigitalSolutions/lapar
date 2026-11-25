@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useData } from '../../data/context';
-import { ProCtaProvider, useFeature, useProCta, type ProCta } from '../../entitlements/hooks';
+import { ProCtaProvider, useEntitlements, useFeature, useProCta, type ProCta } from '../../entitlements/hooks';
 import type { FeatureKey } from '../../entitlements/keys';
 import { focusRing, ProBadge } from '../../ui';
 import { useLoad } from './hooks';
@@ -57,7 +57,8 @@ export function ManagerView({ shopId }: { shopId: string }) {
   const api = useData();
   const outer = useProCta();
   const [section, setSection] = useState<SectionId>('today');
-  const plan = useLoad(() => api.owner.getShopPlan(shopId), shopId);
+  const ent = useEntitlements();
+  const plan = useLoad(() => api.owner.getShopPlan(shopId), `${shopId}:${JSON.stringify(ent)}`);
 
   // Same choice as the Plan page: the shop's Ask Teras number, else a neutral message (the demo keeps its own text).
   const number = plan.data?.askTerasWhatsapp ?? null;
@@ -109,7 +110,7 @@ export function ManagerView({ shopId }: { shopId: string }) {
             ))}
           </div>
         </nav>
-        <main aria-label={labels[section]}>{body[section]}</main>
+        <section aria-label={labels[section]}>{body[section]}</section>
       </div>
     </ProCtaProvider>
   );

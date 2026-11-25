@@ -59,7 +59,7 @@ export function TodaySection({ shopId }: { shopId: string }) {
               <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{s.orders}</p>
             </Card>
             <Card className="col-span-2">
-              <p className="text-sm text-stone-600">{t('average_bill', { bills: s.bills })}</p>
+              <p className="text-sm text-stone-600">{t(s.bills === 1 ? 'average_bill_one' : 'average_bill', { bills: s.bills })}</p>
               <p className="text-2xl font-extrabold text-stone-900 tabular-nums">{formatRM(s.averageBillSen)}</p>
             </Card>
           </div>

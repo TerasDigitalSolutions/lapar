@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useData } from '../../data/context';
-import { toLaparError, useLiveQuery, usePolling } from '../../data/hooks';
+import { toLaparError, usePolling } from '../../data/hooks';
 import type { CustomerTabDTO, LaparError, MenuDTO, MenuItem, Uuid } from '../../data/types';
 import { getLocale, setLocale, type Locale } from '../../i18n';
 import { formatRM } from '../../lib/money';
@@ -8,17 +8,11 @@ import { pickSuggestions } from '../../lib/suggestions';
 import { Button, EmptyState, ErrorState, Loading, PhotoTile, Segmented, TabBar } from '../../ui';
 import { addLine, loadCart, loadCounterTabs, loadTabId, markSeen, saveCart, saveCounterTab, saveTabId, seenSet, tr, unitSen, type CartLine } from './cart';
 import { useT } from './messages';
-import { CallPanel, CounterOrders, StatusPanel } from './panels';
+import { CallPanel, CounterOrders, LiveSync, StatusPanel } from './panels';
 import { CartSheet, ItemPrice, ItemSheet, PickSheet } from './sheets';
 
 type Sheet = { k: 'item'; item: MenuItem; from: Uuid | null; ret: 'suggest' | 'cart' } | { k: 'suggest'; source: MenuItem; items: MenuItem[] } | { k: 'nudge'; items: MenuItem[] } | { k: 'cart' } | null;
 type Panel = 'menu' | 'orders' | 'call';
-
-/** Demo only: reloads menu and status as soon as the shop changes (needs `subscribeShop`). */
-function LiveSync({ shopId, load }: { shopId: Uuid; load: () => Promise<unknown> }) {
-  useLiveQuery(load, { shopId, tables: ['orders', 'order_items', 'tabs', 'service_requests'], pollMs: 10_000 });
-  return null;
-}
 
 /** `live`: also reload on shop changes (demo shell only; the real route must not import supabase-js). */
 export function CustomerView({ tableToken, live = false }: { tableToken: string; live?: boolean }) {
@@ -176,7 +170,7 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
           <p className="text-stone-700">{takeaway ? t('takeaway') : menu.table.label}</p>
         </div>
         {menu.features.multi_language_menu && (
-          <div className="ml-auto w-40 shrink-0">
+          <div className="ml-auto w-52 shrink-0">
             <Segmented<Locale>
               label={t('language')}
               value={getLocale()}
@@ -245,7 +239,7 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
       )}
       {panel === 'orders' && (
         <div role="tabpanel" id="panel-orders" aria-labelledby="tab-orders">
-          {takeaway ? <CounterOrders token={tableToken} ids={counterIds} sent={sent} /> : <StatusPanel tab={tab} error={tabError} onRetry={() => void loadTab()} sent={sent} />}
+          {takeaway ? <CounterOrders token={tableToken} ids={counterIds} sent={sent} shopId={live ? menu.shop.id : undefined} /> : <StatusPanel tab={tab} error={tabError} onRetry={() => void loadTab()} sent={sent} />}
         </div>
       )}
       {panel === 'call' && (

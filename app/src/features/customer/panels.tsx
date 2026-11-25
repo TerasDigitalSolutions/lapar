@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { toLaparError, usePolling } from '../../data/hooks';
+import { toLaparError, useLiveQuery, usePolling } from '../../data/hooks';
 import { useData } from '../../data/context';
-import type { CustomerTabDTO, ServiceReason } from '../../data/types';
+import type { CustomerTabDTO, ServiceReason, Uuid } from '../../data/types';
 import { formatRM } from '../../lib/money';
 import { customerStatus, type CustomerStatus } from '../../lib/status';
 import { Banner, Button, EmptyState, ErrorState, Field, Loading, Sheet, inputClass } from '../../ui';
@@ -67,11 +67,15 @@ export function StatusPanel({ tab, error, onRetry, sent }: { tab: CustomerTabDTO
       ))}
       {tab.tab && tab.orders.length > 0 && (
         <section aria-label={t('bill')} className="flex flex-col gap-1 rounded-xl bg-stone-100 p-4">
-          <div className="flex justify-between text-xl font-bold">
-            <span>{t('bill_total')}</span>
-            <span>{formatRM(tab.tab.totalSen)}</span>
-          </div>
-          {tab.tab.pendingSen > 0 && (
+          {tab.tab.totalSen === 0 && tab.tab.pendingSen > 0 ? (
+            <p className="text-xl font-bold">{t('bill_pending_amount', { amount: formatRM(tab.tab.pendingSen) })}</p>
+          ) : (
+            <div className="flex justify-between text-xl font-bold">
+              <span>{t('bill_total')}</span>
+              <span>{formatRM(tab.tab.totalSen)}</span>
+            </div>
+          )}
+          {tab.tab.pendingSen > 0 && tab.tab.totalSen > 0 && (
             <div className="flex justify-between text-stone-700">
               <span>{t('bill_pending')}</span>
               <span>{formatRM(tab.tab.pendingSen)}</span>
@@ -142,7 +146,7 @@ export function CallPanel({ token, tab, onCalled }: { token: string; tab: Custom
       )}
       <Sheet open={note !== null} onClose={() => setNote(null)} title={t('call_other_title')}>
         <div className="flex flex-col gap-4">
-          <Field label={t('note')} hint={t('note_count', { n: (note ?? '').length })}>
+          <Field label={t('note_staff')} hint={t('note_count', { n: (note ?? '').length })}>
             {(p) => <textarea {...p} className={inputClass} rows={3} maxLength={140} value={note ?? ''} onChange={(e) => setNote(e.target.value)} />}
           </Field>
           <Button block disabled={busy} onClick={() => call('other', note?.trim())}>
@@ -154,7 +158,13 @@ export function CallPanel({ token, tab, onCalled }: { token: string; tab: Custom
   );
 }
 
-function CounterTab({ token, tabId, sent }: { token: string; tabId: string; sent: boolean }) {
+/** Demo only: reloads as soon as the shop changes (needs `subscribeShop`). */
+export function LiveSync({ shopId, load }: { shopId: Uuid; load: () => Promise<unknown> }) {
+  useLiveQuery(load, { shopId, tables: ['orders', 'order_items', 'tabs', 'service_requests'], pollMs: 10_000 });
+  return null;
+}
+
+function CounterTab({ token, tabId, sent, shopId }: { token: string; tabId: string; sent: boolean; shopId?: Uuid }) {
   const data = useData();
   const [tab, setTab] = useState<CustomerTabDTO | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -167,19 +177,24 @@ function CounterTab({ token, tabId, sent }: { token: string; tabId: string; sent
     [data, token, tabId],
   );
   useEffect(() => void load(), [load]);
-  usePolling(load, 10_000);
-  return <StatusPanel tab={tab} error={error} onRetry={() => void load()} sent={sent} />;
+  usePolling(load, shopId ? null : 10_000);
+  return (
+    <>
+      {shopId && <LiveSync shopId={shopId} load={load} />}
+      <StatusPanel tab={tab} error={error} onRetry={() => void load()} sent={sent} />
+    </>
+  );
 }
 
 /** Takeaway: every order placed from this device, each polled by its own tab id. Newest first. */
-export function CounterOrders({ token, ids, sent }: { token: string; ids: string[]; sent: boolean }) {
+export function CounterOrders({ token, ids, sent, shopId }: { token: string; ids: string[]; sent: boolean; shopId?: Uuid }) {
   const t = useT();
   if (ids.length === 0) return <EmptyState title={t('status_empty')}>{t('orders_empty_takeaway')}</EmptyState>;
   return (
     <div>
       <h2 className="px-4 pt-4 text-lg font-bold">{t('my_orders')}</h2>
       {[...ids].reverse().map((id, i) => (
-        <CounterTab key={id} token={token} tabId={id} sent={sent && i === 0} />
+        <CounterTab key={id} token={token} tabId={id} sent={sent && i === 0} shopId={shopId} />
       ))}
     </div>
   );

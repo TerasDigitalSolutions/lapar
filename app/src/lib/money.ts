@@ -3,7 +3,7 @@
 /** 1230 -> "RM 12.30" (negative: "-RM 0.05"). */
 export function formatRM(sen: number): string {
   const abs = Math.abs(Math.round(sen));
-  return `${sen < 0 ? '-' : ''}RM ${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+  return `${sen < 0 ? '-' : ''}RM ${String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+$)/g, ',')}.${String(abs % 100).padStart(2, '0')}`;
 }
 
 /** "12.3", "RM 12.30" -> sen; null when not a non-negative amount with at most 2 decimals. */
