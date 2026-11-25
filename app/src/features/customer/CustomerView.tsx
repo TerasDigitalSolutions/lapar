@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useData } from '../../data/context';
-import { toLaparError, usePolling } from '../../data/hooks';
+import { toLaparError, useLiveQuery, usePolling } from '../../data/hooks';
 import type { CustomerTabDTO, LaparError, MenuDTO, MenuItem, Uuid } from '../../data/types';
+import { getLocale, setLocale, type Locale } from '../../i18n';
 import { formatRM } from '../../lib/money';
 import { pickSuggestions } from '../../lib/suggestions';
-import { Button, EmptyState, ErrorState, Loading, PhotoTile, TabBar } from '../../ui';
-import { addLine, loadCart, loadTabId, markSeen, saveCart, saveTabId, seenSet, tr, unitSen, type CartLine } from './cart';
+import { Button, EmptyState, ErrorState, Loading, PhotoTile, Segmented, TabBar } from '../../ui';
+import { addLine, loadCart, loadCounterTabs, loadTabId, markSeen, saveCart, saveCounterTab, saveTabId, seenSet, tr, unitSen, type CartLine } from './cart';
 import { useT } from './messages';
-import { CallPanel, StatusPanel } from './panels';
+import { CallPanel, CounterOrders, StatusPanel } from './panels';
 import { CartSheet, ItemPrice, ItemSheet, PickSheet } from './sheets';
 
 type Sheet = { k: 'item'; item: MenuItem; from: Uuid | null; ret: 'suggest' | 'cart' } | { k: 'suggest'; source: MenuItem; items: MenuItem[] } | { k: 'nudge'; items: MenuItem[] } | { k: 'cart' } | null;
 type Panel = 'menu' | 'orders' | 'call';
 
-export function CustomerView({ tableToken }: { tableToken: string }) {
+/** Demo only: reloads menu and status as soon as the shop changes (needs `subscribeShop`). */
+function LiveSync({ shopId, load }: { shopId: Uuid; load: () => Promise<unknown> }) {
+  useLiveQuery(load, { shopId, tables: ['orders', 'order_items', 'tabs', 'service_requests'], pollMs: 10_000 });
+  return null;
+}
+
+/** `live`: also reload on shop changes (demo shell only; the real route must not import supabase-js). */
+export function CustomerView({ tableToken, live = false }: { tableToken: string; live?: boolean }) {
   const data = useData();
   const t = useT();
   const [menu, setMenu] = useState<MenuDTO | null>(null);
@@ -26,6 +34,9 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState<CustomerTabDTO | null>(null);
   const [tabError, setTabError] = useState<unknown>(null);
+  const [counterIds, setCounterIds] = useState<string[]>(() => loadCounterTabs(tableToken));
+  const [pickup, setPickup] = useState('');
+  const takeaway = !!menu && menu.features.takeaway && menu.table.kind === 'counter';
 
   const setCart = useCallback(
     (f: (c: CartLine[]) => CartLine[]) =>
@@ -48,18 +59,20 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
 
   const loadTab = useCallback(
     () =>
-      data.customer.getTab(tableToken, loadTabId(tableToken)).then(
-        (x) => (setTab(x), setTabError(null)),
-        (e: unknown) => setTabError(e),
-      ),
-    [data, tableToken],
+      takeaway // counter tabs are polled one by one in CounterOrders
+        ? Promise.resolve()
+        : data.customer.getTab(tableToken, loadTabId(tableToken)).then(
+            (x) => (setTab(x), setTabError(null)),
+            (e: unknown) => setTabError(e),
+          ),
+    [data, tableToken, takeaway],
   );
 
   useEffect(() => {
     void loadMenu();
     void loadTab();
   }, [loadMenu, loadTab]);
-  usePolling(loadTab, 10_000);
+  usePolling(loadTab, live ? null : 10_000);
 
   const itemsById = useMemo(() => new Map((menu?.items ?? []).map((i) => [i.id, i])), [menu]);
   const categoriesById = useMemo(() => new Map((menu?.categories ?? []).map((c) => [c.id, c])), [menu]);
@@ -76,6 +89,7 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
   const cartCount = validCart.reduce((n, l) => n + l.qty, 0);
   const cartTotal = validCart.reduce((s, l) => s + l.qty * unitSen(itemsById.get(l.itemId)!, l.optionIds), 0);
   const sections = menu.categories.map((c) => ({ c, items: menu.items.filter((i) => i.categoryId === c.id) })).filter((s) => s.items.length > 0);
+  const windowOf = (i: MenuItem) => categoriesById.get(i.categoryId)?.window;
   const orderable = (i: MenuItem) => !i.soldOut && categoriesById.get(i.categoryId)?.availableNow !== false;
 
   const open = (item: MenuItem, from: Uuid | null = null, ret: 'suggest' | 'cart' = 'suggest') => setSheet({ k: 'item', item, from, ret });
@@ -116,8 +130,12 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
     try {
       const r = await data.customer.placeOrder(tableToken, {
         lines: validCart.map((l) => ({ itemId: l.itemId, qty: l.qty, optionIds: l.optionIds, note: l.note || null, suggestedFromItemId: l.from })),
+        ...(takeaway && pickup ? { pickupAt: pickup } : {}),
       });
-      saveTabId(tableToken, r.tabId);
+      if (takeaway) {
+        saveCounterTab(tableToken, r.tabId);
+        setCounterIds(loadCounterTabs(tableToken));
+      } else saveTabId(tableToken, r.tabId);
       setCart(() => []);
       setSheet(null);
       setSent(true);
@@ -145,18 +163,34 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
   const tabs = [
     { id: 'menu' as const, label: t('tab_menu') },
     { id: 'orders' as const, label: t('tab_orders') },
-    ...(menu.features.call_server ? [{ id: 'call' as const, label: t('tab_call') }] : []),
+    ...(menu.features.call_server && !takeaway ? [{ id: 'call' as const, label: t('tab_call') }] : []),
   ];
 
   return (
     <div className="mx-auto min-h-dvh max-w-xl bg-stone-50 pb-28">
+      {live && <LiveSync shopId={menu.shop.id} load={() => Promise.all([loadMenu(), loadTab()])} />}
       <header className="flex items-center gap-3 bg-white p-4">
         {menu.shop.logoUrl && <PhotoTile url={menu.shop.logoUrl} name={menu.shop.name} className="size-12" />}
         <div className="min-w-0">
           <h1 className="truncate text-xl font-bold">{menu.shop.name}</h1>
-          <p className="text-stone-700">{menu.table.label}</p>
+          <p className="text-stone-700">{takeaway ? t('takeaway') : menu.table.label}</p>
         </div>
+        {menu.features.multi_language_menu && (
+          <div className="ml-auto w-40 shrink-0">
+            <Segmented<Locale>
+              label={t('language')}
+              value={getLocale()}
+              onChange={setLocale}
+              options={[
+                { value: 'en', label: t('lang_en') },
+                { value: 'ms', label: t('lang_ms') },
+                { value: 'zh', label: t('lang_zh') },
+              ]}
+            />
+          </div>
+        )}
       </header>
+      {takeaway && panel === 'menu' && <p className="bg-orange-50 px-4 py-2 font-semibold text-orange-900">{t('takeaway_body')}</p>}
       <TabBar tabs={tabs} value={panel} onChange={setPanel} />
 
       {panel === 'menu' && (
@@ -192,7 +226,11 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
                           <PhotoTile url={i.photoUrl} name={i.name} />
                           <span className="min-w-0 flex-1">
                             <span className="block font-semibold">{tr(i.name, i.translations)}</span>
-                            {!orderable(i) && <span className="block text-sm font-medium text-stone-700">{i.soldOut ? t('sold_out') : t('not_now')}</span>}
+                            {!orderable(i) && (
+                              <span className="block text-sm font-medium text-stone-700">
+                                {i.soldOut ? t('sold_out') : windowOf(i) ? t('available_window', { from: windowOf(i)!.from, to: windowOf(i)!.to }) : t('not_now')}
+                              </span>
+                            )}
                           </span>
                           <ItemPrice item={i} />
                         </button>
@@ -207,7 +245,7 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
       )}
       {panel === 'orders' && (
         <div role="tabpanel" id="panel-orders" aria-labelledby="tab-orders">
-          <StatusPanel tab={tab} error={tabError} onRetry={() => void loadTab()} sent={sent} />
+          {takeaway ? <CounterOrders token={tableToken} ids={counterIds} sent={sent} /> : <StatusPanel tab={tab} error={tabError} onRetry={() => void loadTab()} sent={sent} />}
         </div>
       )}
       {panel === 'call' && (
@@ -257,6 +295,8 @@ export function CustomerView({ tableToken }: { tableToken: string }) {
           cart={validCart}
           sending={sending}
           error={placeError}
+          pickup={takeaway ? pickup : undefined}
+          onPickup={setPickup}
           onQty={(i, qty) => setCart(() => validCart.map((l, j) => (j === i ? { ...l, qty } : l)))}
           onRemove={(i) => setCart(() => validCart.filter((_, j) => j !== i))}
           onPlace={() => void place()}

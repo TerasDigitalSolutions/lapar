@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { MenuDTO, MenuItem, Uuid } from '../../data/types';
 import { formatRM } from '../../lib/money';
 import { Banner, Button, Field, PhotoTile, QtyStepper, Sheet, inputClass } from '../../ui';
-import { optionNames, tr, unitSen, type CartLine } from './cart';
+import { optionNames, pickupSlots, hhmm, tr, trDesc, unitSen, type CartLine } from './cart';
 import { useT } from './messages';
 
 const rowBtn = 'flex min-h-12 w-full items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 text-left';
@@ -13,6 +13,7 @@ export function ItemPrice({ item }: { item: MenuItem }) {
     <span className="flex flex-col">
       <span className="font-bold text-stone-900">{formatRM(item.effectivePriceSen)}</span>
       {item.effectivePriceSen < item.priceSen && <span className="text-sm text-stone-500 line-through">{t('was', { price: formatRM(item.priceSen) })}</span>}
+      {item.promo && <span className="text-sm font-semibold text-orange-800">{tr(item.promo.name, item.promo.translations)}</span>}
     </span>
   );
 }
@@ -30,8 +31,13 @@ export function ItemSheet({ item, from, onAdd, onClose }: { item: MenuItem; from
   return (
     <Sheet open onClose={onClose} title={tr(item.name, item.translations)}>
       <div className="flex flex-col gap-5">
-        {item.description && <p className="text-stone-700">{item.description}</p>}
-        {item.combo && <p className="text-stone-700">{item.combo.components.map((c) => `${c.qty} x ${tr(c.name, c.translations)}`).join(', ')}</p>}
+        {item.description && <p className="text-stone-700">{trDesc(item)}</p>}
+        {item.combo && <p className="text-stone-700">{t('set_includes', { items: item.combo.components.map((c) => `${c.qty} x ${tr(c.name, c.translations)}`).join(', ') })}</p>}
+        {item.promo && (
+          <p className="font-semibold text-orange-800">
+            {tr(item.promo.name, item.promo.translations)} · <span className="line-through">{formatRM(item.priceSen)}</span> {formatRM(item.effectivePriceSen)}
+          </p>
+        )}
         {item.groups.map((g) => {
           const chosen = picked[g.id] ?? [];
           const single = g.maxSelect === 1;
@@ -134,8 +140,13 @@ export function CartSheet({
   onRemove,
   onPlace,
   onClose,
+  pickup,
+  onPickup,
 }: {
   menu: MenuDTO;
+  /** Takeaway (counter token with `takeaway`): '' = as soon as possible, else an ISO time. */
+  pickup?: string;
+  onPickup?: (v: string) => void;
   cart: CartLine[];
   sending: boolean;
   error: string | null;
@@ -174,6 +185,20 @@ export function CartSheet({
             );
           })}
         </ul>
+        {pickup !== undefined && onPickup && (
+          <Field label={t('pickup_time')}>
+            {(p) => (
+              <select {...p} className={inputClass} value={pickup} onChange={(e) => onPickup(e.target.value)}>
+                <option value="">{t('pickup_asap')}</option>
+                {pickupSlots(menu.serverNow).map((iso) => (
+                  <option key={iso} value={iso}>
+                    {hhmm(iso)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        )}
         <div className="flex items-baseline justify-between text-xl font-bold">
           <span>{t('total')}</span>
           <span>{formatRM(total)}</span>

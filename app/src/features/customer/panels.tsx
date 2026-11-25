@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { toLaparError } from '../../data/hooks';
+import { useCallback, useEffect, useState } from 'react';
+import { toLaparError, usePolling } from '../../data/hooks';
 import { useData } from '../../data/context';
 import type { CustomerTabDTO, ServiceReason } from '../../data/types';
 import { formatRM } from '../../lib/money';
 import { customerStatus, type CustomerStatus } from '../../lib/status';
 import { Banner, Button, EmptyState, ErrorState, Field, Loading, Sheet, inputClass } from '../../ui';
+import { hhmm } from './cart';
 import { useT } from './messages';
 
 const STATUS_KEY = {
@@ -32,6 +33,14 @@ export function StatusPanel({ tab, error, onRetry, sent }: { tab: CustomerTabDTO
   return (
     <div className="flex flex-col gap-4 p-4">
       {sent && <Banner kind="info">{t('order_sent')}</Banner>}
+      {tab.tab?.pickupNo != null && (
+        <section aria-label={t('pickup_number')} className="flex flex-col items-center gap-1 rounded-xl bg-orange-50 p-4 text-center">
+          <span className="font-semibold text-stone-800">{t('pickup_number')}</span>
+          <span className="text-7xl font-black leading-none text-orange-800">{tab.tab.pickupNo}</span>
+          <span className="text-stone-700">{tab.tab.pickupAt ? t('pickup_at', { time: hhmm(tab.tab.pickupAt) }) : t('pickup_asap_short')}</span>
+          {tab.tab.status === 'closed' && <span className="font-semibold text-stone-700">{t('tab_closed')}</span>}
+        </section>
+      )}
       {tab.orders.length === 0 && <EmptyState title={t('status_empty')}>{t('status_empty_body')}</EmptyState>}
       {tab.orders.map((o) => (
         <section key={o.id} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3">
@@ -141,6 +150,37 @@ export function CallPanel({ token, tab, onCalled }: { token: string; tab: Custom
           </Button>
         </div>
       </Sheet>
+    </div>
+  );
+}
+
+function CounterTab({ token, tabId, sent }: { token: string; tabId: string; sent: boolean }) {
+  const data = useData();
+  const [tab, setTab] = useState<CustomerTabDTO | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(
+    () =>
+      data.customer.getTab(token, tabId).then(
+        (x) => (setTab(x), setError(null)),
+        (e: unknown) => setError(e),
+      ),
+    [data, token, tabId],
+  );
+  useEffect(() => void load(), [load]);
+  usePolling(load, 10_000);
+  return <StatusPanel tab={tab} error={error} onRetry={() => void load()} sent={sent} />;
+}
+
+/** Takeaway: every order placed from this device, each polled by its own tab id. Newest first. */
+export function CounterOrders({ token, ids, sent }: { token: string; ids: string[]; sent: boolean }) {
+  const t = useT();
+  if (ids.length === 0) return <EmptyState title={t('status_empty')}>{t('orders_empty_takeaway')}</EmptyState>;
+  return (
+    <div>
+      <h2 className="px-4 pt-4 text-lg font-bold">{t('my_orders')}</h2>
+      {[...ids].reverse().map((id, i) => (
+        <CounterTab key={id} token={token} tabId={id} sent={sent && i === 0} />
+      ))}
     </div>
   );
 }

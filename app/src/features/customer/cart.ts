@@ -1,6 +1,7 @@
 import type { MenuItem, Translations, Uuid } from '../../data/types';
 import { getLocale } from '../../i18n';
 import { readJson, writeJson } from '../../lib/storage';
+import { mytDayOf, mytParts, mytToday } from '../../lib/time';
 
 /** One cart line. Prices are never stored: they are recomputed from the menu for display only. */
 export interface CartLine {
@@ -26,10 +27,36 @@ export const markSeen = (token: string, kind: string, id: string) => {
 export const loadTabId = (token: string): string | null => readJson<string | null>(key('tab', token), null, 'session');
 export const saveTabId = (token: string, id: string) => writeJson(key('tab', token), id, 'session');
 
+/** Counter (takeaway) tab ids placed from this device; kept across reloads. */
+export const loadCounterTabs = (token: string): string[] => readJson<string[]>(key('ctabs', token), []);
+export const saveCounterTab = (token: string, id: string) => {
+  const s = loadCounterTabs(token);
+  if (!s.includes(id)) writeJson(key('ctabs', token), [...s, id]);
+};
+
+export const hhmm = (iso: string): string => {
+  const p = mytParts(new Date(iso));
+  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+};
+
+/** 15-minute pickup slots from now until the end of today (MYT), at most 40. */
+export function pickupSlots(serverNow: string): string[] {
+  const step = 15 * 60_000;
+  const now = new Date(serverNow);
+  const out: string[] = [];
+  for (let t = Math.ceil(now.getTime() / step) * step; out.length < 40 && mytDayOf(new Date(t).toISOString()) === mytToday(now); t += step) out.push(new Date(t).toISOString());
+  return out;
+}
+
 /** Name in the diner's language when the menu carries a translation (empty unless multi_language_menu). */
 export function tr(name: string, translations: Translations): string {
   const l = getLocale();
   return l === 'en' ? name : (translations[l]?.name ?? name);
+}
+
+export function trDesc(item: MenuItem): string {
+  const l = getLocale();
+  return l === 'en' ? item.description : (item.translations[l]?.description ?? item.description);
 }
 
 export function unitSen(item: MenuItem, optionIds: readonly Uuid[]): number {
