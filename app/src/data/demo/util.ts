@@ -1,5 +1,6 @@
 /** Helpers shared by the demo modules: context, guards, money and DTO builders. */
 import { PLAN_DEFAULTS, resolveEntitlements, withinLimit } from '../../entitlements/keys';
+import { mytToday } from '../../lib/time';
 import {
   LaparError,
   type CustomerLineDTO,
@@ -39,7 +40,15 @@ export function gate(ctx: Ctx, key: FeatureKey): void {
   if (!has(ctx, key)) fail('feature_not_enabled', key);
 }
 
-/** The key is on, but the demo does not implement it yet (card M1-G). */
+const CLOCK_TIME = { breakfast: '08:30', lunch: '12:30', afternoon: '15:30' } as const;
+
+/** The moment menu windows and promos are judged at: the demo clock preset (today, MYT) or the real time. */
+export function menuNow(ctx: Ctx): Date {
+  const c = ctx.s.clock;
+  return c === 'real' ? ctx.now() : new Date(`${mytToday(ctx.now())}T${CLOCK_TIME[c]}:00+08:00`);
+}
+
+/** The key is on, but the demo does not implement it yet (M1-L reports and export). */
 export function proTodo(ctx: Ctx, key: FeatureKey): never {
   gate(ctx, key);
   return fail('not_implemented', key);

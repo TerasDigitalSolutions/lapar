@@ -1,4 +1,6 @@
 /** Customer API (DATA-MODEL 6.1), Basic rules. Pro paths: card M1-G. */
+import { bestPromo, promoEndsAt } from '../../lib/pricing';
+import { inWindow, mytDayOf, mytToday } from '../../lib/time';
 import type {
   CustomerApi,
   CustomerOrderDTO,
@@ -8,10 +10,12 @@ import type {
   MenuItem,
   MenuSuggestion,
   OrderLineInput,
+  PickupBoardDTO,
   PlaceOrderResult,
   PricedLine,
   ServiceReason,
 } from '../types';
+import { computeAutoPairings } from './pairings';
 import type { OrderItemRow, OrderRow, TabRow } from './store';
 import {
   bySort,
@@ -22,9 +26,9 @@ import {
   fail,
   gate,
   linesOfOrder,
+  menuNow,
   nowIso,
   ordersOfTab,
-  proTodo,
   tabMoney,
   tableByToken,
   text,
@@ -34,6 +38,8 @@ import {
 const REASONS: readonly ServiceReason[] = ['bill', 'water', 'other'];
 const RATE_WINDOW_MS = 5 * 60_000;
 const TABLE_RATE_LIMIT = 5;
+const COUNTER_RATE_LIMIT = 20;
+const DAY_MS = 86_400_000;
 
 export function createCustomerApi(ctx: Ctx): CustomerApi {
   const needTable = (token: string) => tableByToken(ctx.s, token) ?? fail('not_found');
@@ -55,6 +61,8 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       if (!s.shop.active) return { ...base, categories: [], items: [] };
 
       const lang = features.multi_language_menu;
+      const at = menuNow(ctx);
+      const auto = features.auto_pairings ? computeAutoPairings(s, ctx.now()) : [];
       const catSort = new Map(s.categories.map((c) => [c.id, c.sort]));
       const itemsById = new Map(s.items.map((i) => [i.id, i]));
       const rows = s.items
@@ -69,7 +77,8 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         if (features.manual_pairings)
           s.pairings.filter((p) => p.sourceItemId === i.id).sort((a, b) => a.position - b.position).forEach((p) => add(p.suggestedItemId, 'manual'));
         if (features.auto_pairings)
-          s.autoPairings.filter((p) => p.sourceItemId === i.id).sort((a, b) => a.position - b.position).forEach((p) => add(p.suggestedItemId, 'auto'));
+          auto.filter((p) => p.sourceItemId === i.id).sort((a, b) => a.position - b.position).forEach((p) => add(p.suggestedItemId, 'auto'));
+        const best = features.promos ? bestPromo(i, s.promos, at) : null;
         return {
           id: i.id,
           categoryId: i.categoryId,
@@ -77,8 +86,8 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
           description: i.description,
           translations: lang ? i.translations : {},
           priceSen: i.priceSen,
-          effectivePriceSen: i.priceSen, // M1-G: promos
-          promo: null,
+          effectivePriceSen: best?.priceSen ?? i.priceSen,
+          promo: best ? { id: best.promo.id, name: best.promo.name, translations: lang ? best.promo.translations : {}, endsAt: promoEndsAt(best.promo, at) } : null,
           photoUrl: i.photoUrl,
           soldOut: i.soldOut,
           sort: i.sort,
@@ -117,14 +126,10 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       const categories = s.categories
         .filter((c) => used.has(c.id))
         .sort(bySort)
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          translations: lang ? c.translations : {},
-          sort: c.sort,
-          window: null, // M1-G: timed menus
-          availableNow: true,
-        }));
+        .map((c) => {
+          const window = features.timed_menus ? c.window : null;
+          return { id: c.id, name: c.name, translations: lang ? c.translations : {}, sort: c.sort, window, availableNow: !window || inWindow(window, at) };
+        });
       return { ...base, categories, items };
     },
 
@@ -134,15 +139,22 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       if (!s.shop.active) fail('shop_inactive');
       gate(ctx, 'qr_ordering');
       const features = entitlements(ctx).features;
-      if (table.kind === 'counter') proTodo(ctx, 'takeaway');
-      if (input?.pickupAt != null) fail('invalid_input', 'pickup_at');
+      const counter = table.kind === 'counter';
+      if (counter) gate(ctx, 'takeaway');
+      let pickupAt: string | null = null;
+      if (input?.pickupAt != null) {
+        const when = new Date(input.pickupAt);
+        if (!counter || Number.isNaN(when.getTime()) || when.getTime() < ctx.now().getTime() - 60_000 || mytDayOf(when.toISOString()) !== mytToday(ctx.now())) fail('invalid_input', 'pickup_at');
+        pickupAt = when.toISOString();
+      }
       const lines = input?.lines;
       if (!Array.isArray(lines) || lines.length < 1 || lines.length > 30) fail('invalid_input', 'lines');
 
       const since = ctx.now().getTime() - RATE_WINDOW_MS;
       const tableTabs = new Set(s.tabs.filter((t) => t.tableId === table.id).map((t) => t.id));
       const recent = s.orders.filter((o) => tableTabs.has(o.tabId) && new Date(o.createdAt).getTime() > since).length;
-      if (recent >= TABLE_RATE_LIMIT) fail('rate_limited');
+      if (recent >= (counter ? COUNTER_RATE_LIMIT : TABLE_RATE_LIMIT)) fail('rate_limited');
+      const at = menuNow(ctx);
 
       // Validate and price every line before changing anything.
       const staged = lines.map((raw: OrderLineInput) => {
@@ -157,7 +169,12 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         if (!item || !item.active) fail('item_unavailable', String(raw.itemId));
         if (item.soldOut) fail('sold_out', item.id);
         if (item.isCombo) {
-          proTodo(ctx, 'combos');
+          gate(ctx, 'combos');
+          if (optionIds.length) fail('invalid_input', 'option_ids');
+        }
+        if (features.timed_menus) {
+          const window = s.categories.find((c) => c.id === item.categoryId)?.window;
+          if (window && !inWindow(window, at)) fail('item_unavailable', item.id);
         }
         const groups = s.groups.filter((g) => g.itemId === item.id);
         const picked = optionIds.map((id) => s.options.find((o) => o.id === id && groups.some((g) => g.id === o.groupId)) ?? fail('invalid_input', 'option_ids'));
@@ -174,17 +191,34 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
           priceDeltaSen: o.priceDeltaSen,
         }));
         const optionsPriceSen = snapshot.reduce((sum, o) => sum + o.priceDeltaSen, 0);
-        // M1-G: timed menus and promos. Basic prices at the list price.
-        const stationId = (features.multi_station && s.stations.find((x) => x.id === item.stationId && x.active)?.id) || defaultStation(s)?.id;
+        const routed = (itemStationId: string) => (features.multi_station && s.stations.find((x) => x.id === itemStationId && x.active)?.id) || defaultStation(s)?.id;
+        const best = features.promos ? bestPromo(item, s.promos, at) : null;
+        const stationId = item.isCombo ? defaultStation(s)?.id : routed(item.stationId);
         if (!stationId) fail('not_found', 'station');
-        return { item, qty, note, snapshot, optionsPriceSen, stationId, from };
+        const components = item.isCombo
+          ? s.comboComponents
+              .filter((c) => c.comboItemId === item.id)
+              .sort(bySort)
+              .flatMap((c) => {
+                const it = s.items.find((x) => x.id === c.itemId);
+                return it ? [{ item: it, qty: qty * c.qty, stationId: routed(it.stationId) ?? stationId }] : [];
+              })
+          : [];
+        return { item, qty, note, snapshot, optionsPriceSen, stationId, from, unitSen: best?.priceSen ?? item.priceSen, promoId: best?.promo.id ?? null, components };
       });
 
       const now = nowIso(ctx);
-      let tab: TabRow | undefined = s.tabs.find((t) => t.tableId === table.id && t.status === 'open' && t.kind === 'table');
+      let tab: TabRow | undefined = counter ? undefined : s.tabs.find((t) => t.tableId === table.id && t.status === 'open' && t.kind === 'table');
       const newTab = !tab;
       if (!tab) {
-        tab = { id: ctx.id('tab'), tableId: table.id, kind: 'table', status: 'open', openedAt: now, closedAt: null, pickupNo: null, pickupAt: null, paidTotalSen: null, roundingSen: null, updatedAt: now };
+        let pickupNo: number | null = null;
+        if (counter) {
+          const day = mytToday(ctx.now());
+          let row = s.pickupCounters.find((c) => c.day === day);
+          if (!row) s.pickupCounters.push((row = { day, lastNo: 0 }));
+          pickupNo = ++row.lastNo;
+        }
+        tab = { id: ctx.id('tab'), tableId: table.id, kind: table.kind, status: 'open', openedAt: now, closedAt: null, pickupNo, pickupAt, paidTotalSen: null, roundingSen: null, updatedAt: now };
         s.tabs.push(tab);
       }
       const mode = features.approvals ? s.shop.approvalMode : 'none';
@@ -201,58 +235,73 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       };
       s.orders.push(order);
 
-      const priced: PricedLine[] = staged.map((l, i) => {
-        const row: OrderItemRow = {
+      const priced: PricedLine[] = [];
+      let lineNo = 0;
+      const push = (row: Omit<OrderItemRow, 'id' | 'orderId' | 'lineNo' | 'status' | 'statusChangedAt' | 'columnId' | 'readyAt' | 'servedAt' | 'paidPaymentId' | 'createdAt' | 'lineTotalSen'>) => {
+        const line: OrderItemRow = {
+          ...row,
           id: ctx.id('line'),
           orderId: order.id,
-          lineNo: i + 1,
-          kind: 'item',
-          parentLineId: null,
-          itemId: l.item.id,
-          nameSnapshot: l.item.name,
-          listPriceSen: l.item.priceSen,
-          unitPriceSen: l.item.priceSen,
-          promoId: null,
-          qty: l.qty,
-          options: l.snapshot,
-          optionsPriceSen: l.optionsPriceSen,
-          lineTotalSen: l.qty * (l.item.priceSen + l.optionsPriceSen),
-          note: l.note,
-          stationId: l.stationId,
+          lineNo: ++lineNo,
+          lineTotalSen: row.qty * (row.unitPriceSen + row.optionsPriceSen),
           status: needsApproval ? 'pending' : 'new',
           statusChangedAt: now,
           columnId: null,
           readyAt: null,
           servedAt: null,
-          suggestedFromItemId: l.from,
           paidPaymentId: null,
           createdAt: now,
         };
-        s.orderItems.push(row);
-        return {
-          lineId: row.id,
-          itemId: row.itemId,
-          kind: row.kind,
-          name: row.nameSnapshot,
-          qty: row.qty,
-          listPriceSen: row.listPriceSen,
-          unitPriceSen: row.unitPriceSen,
-          optionsPriceSen: row.optionsPriceSen,
-          lineTotalSen: row.lineTotalSen,
-          promoId: null,
-        };
-      });
+        s.orderItems.push(line);
+        priced.push({
+          lineId: line.id,
+          itemId: line.itemId,
+          kind: line.kind,
+          name: line.nameSnapshot,
+          qty: line.qty,
+          listPriceSen: line.listPriceSen,
+          unitPriceSen: line.unitPriceSen,
+          optionsPriceSen: line.optionsPriceSen,
+          lineTotalSen: line.lineTotalSen,
+          promoId: line.promoId,
+        });
+        return line;
+      };
+      for (const l of staged) {
+        const parent = push({
+          kind: l.item.isCombo ? 'combo' : 'item',
+          parentLineId: null,
+          itemId: l.item.id,
+          nameSnapshot: l.item.name,
+          listPriceSen: l.item.priceSen,
+          unitPriceSen: l.unitSen,
+          promoId: l.promoId,
+          qty: l.qty,
+          options: l.snapshot,
+          optionsPriceSen: l.optionsPriceSen,
+          note: l.note,
+          stationId: l.stationId,
+          suggestedFromItemId: l.from,
+        });
+        for (const c of l.components)
+          push({ kind: 'component', parentLineId: parent.id, itemId: c.item.id, nameSnapshot: c.item.name, listPriceSen: 0, unitPriceSen: 0, promoId: null, qty: c.qty, options: [], optionsPriceSen: 0, note: l.note, stationId: c.stationId, suggestedFromItemId: null });
+      }
       tab.updatedAt = now;
       ctx.emit(change('tabs', newTab ? 'INSERT' : 'UPDATE', tab.id), change('orders', 'INSERT', order.id), ...priced.map((p) => change('order_items', 'INSERT', p.lineId)));
-      return { orderId: order.id, tabId: tab.id, status: order.status, pickupNo: null, totalSen: priced.reduce((sum, p) => sum + p.lineTotalSen, 0), lines: priced };
+      return { orderId: order.id, tabId: tab.id, status: order.status, pickupNo: tab.pickupNo, totalSen: priced.reduce((sum, p) => sum + p.lineTotalSen, 0), lines: priced };
     },
 
     async getTab(tableToken, tabId): Promise<CustomerTabDTO> {
       const s = ctx.s;
       const table = needTable(tableToken);
-      if (table.kind === 'counter') return proTodo(ctx, 'takeaway');
-      void tabId; // tables ignore the tab id
-      const tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open');
+      let tab: TabRow | undefined;
+      if (table.kind === 'counter') {
+        if (typeof tabId !== 'string' || !tabId) fail('invalid_input', 'tab_id');
+        tab = s.tabs.find((t) => t.id === tabId && t.tableId === table.id);
+        if (!tab || ctx.now().getTime() - new Date(tab.openedAt).getTime() > DAY_MS) fail('not_found');
+      } else {
+        tab = s.tabs.find((t) => t.tableId === table.id && t.status === 'open'); // tables ignore the tab id
+      }
       const orders: CustomerOrderDTO[] = tab
         ? ordersOfTab(s, tab.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -292,8 +341,25 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
       ctx.emit(change('service_requests', 'INSERT', row.id));
     },
 
-    async getPickupBoard() {
-      return fail('not_implemented', 'get_pickup_board');
+    async getPickupBoard(boardToken): Promise<PickupBoardDTO> {
+      const s = ctx.s;
+      if (typeof boardToken !== 'string' || s.shop.pickupBoardToken !== boardToken) fail('not_found');
+      gate(ctx, 'takeaway');
+      const today = mytToday(ctx.now());
+      const counters = new Set(s.tables.filter((t) => t.kind === 'counter').map((t) => t.id));
+      const preparing: number[] = [];
+      const ready: number[] = [];
+      for (const tab of s.tabs) {
+        if (tab.status !== 'open' || !counters.has(tab.tableId) || tab.pickupNo === null || mytDayOf(tab.openedAt) !== today) continue;
+        const orders = ordersOfTab(s, tab.id).filter((o) => o.status === 'approved');
+        if (!orders.length) continue;
+        const lines = orders.flatMap((o) => linesOfOrder(s, o.id)).filter((l) => l.kind !== 'combo' && l.status !== 'cancelled');
+        if (!lines.length || lines.every((l) => l.status === 'served')) continue;
+        if (lines.some((l) => l.status === 'new' || l.status === 'preparing' || l.status === 'cooking')) preparing.push(tab.pickupNo);
+        else if (lines.some((l) => l.status === 'ready')) ready.push(tab.pickupNo);
+      }
+      const asc = (a: number, b: number) => a - b;
+      return { shopName: s.shop.name, preparing: preparing.sort(asc), ready: ready.sort(asc), serverNow: nowIso(ctx) };
     },
   };
 }

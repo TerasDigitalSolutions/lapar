@@ -12,10 +12,12 @@ import type {
   TimeWindow,
   Translations,
 } from '../types';
+import { resizeImage } from '../../lib/image';
 import { getDailySummary } from './reports';
 import {
   assertShop,
   assertWithinLimit,
+
   blobToDataUrl,
   bySort,
   defaultStation,
@@ -26,6 +28,15 @@ import {
   text,
   type Ctx,
 } from './util';
+
+/** Shrinks to 400 px WebP; keeps the original when the browser cannot decode it (e.g. jsdom). */
+async function resizedDataUrl(file: Blob): Promise<string> {
+  try {
+    return await blobToDataUrl(await resizeImage(file, 400, 0.7));
+  } catch {
+    return blobToDataUrl(file);
+  }
+}
 
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const PIN = /^[0-9]{4,6}$/;
@@ -89,7 +100,7 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
 
     async uploadLogo(shopId, file) {
       assertShop(ctx, shopId);
-      return blobToDataUrl(file); // M1-G adds resizing
+      return resizedDataUrl(file);
     },
 
     async getMenuEditor(shopId) {
@@ -168,7 +179,7 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
     async uploadItemPhoto(shopId, itemId, file) {
       assertShop(ctx, shopId);
       const row = s().items.find((i) => i.id === itemId) ?? fail('not_found');
-      row.photoUrl = await blobToDataUrl(file); // M1-G adds resizing
+      row.photoUrl = await resizedDataUrl(file);
       row.photoState = 'staging';
       return saved(row);
     },
@@ -336,7 +347,7 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
 }
 
 /** A 24-character URL-safe token (demo tokens are not secret). */
-function newToken(): string {
+export function newToken(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from({ length: 24 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }

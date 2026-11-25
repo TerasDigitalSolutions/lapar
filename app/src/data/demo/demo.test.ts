@@ -188,7 +188,7 @@ describe('validation', () => {
     const d = make();
     await rejects(d.customer.placeOrder('demo-counter', { lines: [NASI] }), 'feature_not_enabled', 'takeaway');
     await rejects(d.customer.placeOrder(T1, { lines: [{ ...NASI, itemId: 'item-set-a' }] }), 'feature_not_enabled', 'combos');
-    await rejects(d.customer.getPickupBoard('demo-pickup'), 'not_implemented');
+    await rejects(d.customer.getPickupBoard('demo-pickup'), 'feature_not_enabled', 'takeaway');
     await d.admin.setShopActive(SHOP, false);
     expect((await d.customer.getMenu(T1)).shop.active).toBe(false);
     expect((await d.customer.getMenu(T1)).items).toEqual([]);
@@ -426,7 +426,7 @@ describe('plan, Pro stubs and admin', () => {
     expect((await d.customer.getMenu(T1)).features.promos).toBe(true);
     expect((await d.customer.getMenu(T1)).items.some((i) => i.id === 'item-set-a')).toBe(true);
     expect((await d.staff.listPendingOrders(SHOP)).length).toBe(1);
-    await rejects(d.pro.listPromos(SHOP), 'not_implemented', 'promos');
+    await rejects(d.pro.getSalesReport(SHOP, '2026-11-01', '2026-11-25'), 'not_implemented', 'full_reports');
     d.setPlan('basic');
     await rejects(d.pro.listPromos(SHOP), 'feature_not_enabled', 'promos');
     await rejects(d.pro.exportShopMeta(SHOP), 'feature_not_enabled', 'export_backup');

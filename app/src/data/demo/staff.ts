@@ -26,7 +26,6 @@ import {
   linesOfOrder,
   nowIso,
   ordersOfTab,
-  proTodo,
   staffLine,
   tabMoney,
   tabOf,
@@ -290,7 +289,6 @@ export function createStaffApi(ctx: Ctx): StaffApi {
       gate(ctx, 'manual_payments');
       if (!METHODS.includes(input.method)) fail('invalid_input', 'method');
       if (ordersOfTab(s(), tab.id).some((o) => o.status === 'pending_approval')) fail('pending_orders');
-      if (input.orderItemIds?.length) proTodo(ctx, 'bill_split');
       const now = nowIso(ctx);
       const m = tabMoney(s(), tab.id);
       const remaining = Math.max(0, m.totalSen - m.paidSen);
@@ -302,10 +300,20 @@ export function createStaffApi(ctx: Ctx): StaffApi {
         tab.roundingSen = paid.reduce((sum, p) => sum + p.roundingSen, 0);
       };
       let payment: PaymentRow | null = null;
+      let splitLines: OrderItemRow[] = [];
+      if (input.orderItemIds?.length) {
+        gate(ctx, 'bill_split');
+        const paidByAmount = s().payments.some((p) => p.tabId === tab.id && !s().orderItems.some((l) => l.paidPaymentId === p.id));
+        if (paidByAmount) fail('invalid_input', 'mixed_split');
+        const ids = new Set(input.orderItemIds);
+        const approved = new Set(ordersOfTab(s(), tab.id).filter((o) => o.status === 'approved').map((o) => o.id));
+        splitLines = s().orderItems.filter((l) => ids.has(l.id));
+        if (splitLines.length !== ids.size || splitLines.some((l) => !approved.has(l.orderId) || l.kind === 'component' || l.status === 'cancelled' || l.paidPaymentId)) fail('invalid_input', 'order_item_ids');
+      }
       if (remaining > 0) {
-        const amount = input.amountSen ?? remaining;
-        if (!Number.isInteger(amount) || amount < 1 || amount > remaining) fail('invalid_input', 'amount');
-        if (amount < remaining) proTodo(ctx, 'bill_split');
+        const amount = splitLines.length ? splitLines.reduce((sum, l) => sum + l.lineTotalSen, 0) : (input.amountSen ?? remaining);
+        if (!Number.isInteger(amount) || amount < 1 || amount > remaining) fail('invalid_input', splitLines.length ? 'order_item_ids' : 'amount');
+        if (amount < remaining && !splitLines.length) gate(ctx, 'bill_split');
         payment = {
           id: ctx.id('payment'),
           tabId: tab.id,
@@ -316,6 +324,7 @@ export function createStaffApi(ctx: Ctx): StaffApi {
           createdByStaffId: s().actorStaffId,
         };
         s().payments.push(payment);
+        for (const l of splitLines) l.paidPaymentId = payment.id;
       }
       const after = tabMoney(s(), tab.id);
       const tabClosed = after.paidSen >= after.totalSen;

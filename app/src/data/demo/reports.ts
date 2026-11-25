@@ -1,7 +1,7 @@
 /** Daily summary (DATA-MODEL 6.4 `get_daily_summary`, DECISIONS D14). */
 import { addDays, mytDayOf, mytToday } from '../../lib/time';
 import type { DailySummaryDTO, IsoDate, ItemSalesDTO } from '../types';
-import { entitlements, fail, gate, type Ctx } from './util';
+import { entitlements, fail, gate, proTodo, type Ctx } from './util';
 
 export function getDailySummary(ctx: Ctx, day: IsoDate): DailySummaryDTO {
   gate(ctx, 'daily_summary');
@@ -38,3 +38,9 @@ export function getDailySummary(ctx: Ctx, day: IsoDate): DailySummaryDTO {
     topItems,
   };
 }
+
+// Pro reports and export: gated here; card M1-L fills in the bodies (and the from/to/month parameters).
+export const getSalesReport = (ctx: Ctx): never => proTodo(ctx, 'full_reports');
+export const getUpsellReport = (ctx: Ctx): never => proTodo(ctx, 'upsell_report');
+export const exportShopMeta = (ctx: Ctx): never => proTodo(ctx, 'export_backup');
+export const exportOrders = (ctx: Ctx): never => proTodo(ctx, 'export_backup');

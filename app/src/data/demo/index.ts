@@ -71,11 +71,6 @@ export function createDemoData({ persist = true, now = () => new Date() }: DemoO
     },
   };
 
-  const tables = ctx.s.tables
-    .filter((t) => t.active)
-    .sort((a, b) => a.sort - b.sort)
-    .map((t) => ({ token: t.token, label: t.label, kind: t.kind }));
-
   return {
     kind: 'demo',
     customer: isolate(createCustomerApi(ctx)),
@@ -94,8 +89,16 @@ export function createDemoData({ persist = true, now = () => new Date() }: DemoO
     },
 
     shopId: SHOP_ID,
-    tables,
-    pickupBoardToken: PICKUP_BOARD_TOKEN,
+    // Getters: regenerating a table or board token changes them.
+    get tables() {
+      return ctx.s.tables
+        .filter((t) => t.active)
+        .sort((a, b) => a.sort - b.sort)
+        .map((t) => ({ token: t.token, label: t.label, kind: t.kind }));
+    },
+    get pickupBoardToken() {
+      return ctx.s.shop.pickupBoardToken ?? PICKUP_BOARD_TOKEN;
+    },
     getPlan: () => ctx.s.plan,
     setPlan(plan) {
       ctx.s.plan = plan;
