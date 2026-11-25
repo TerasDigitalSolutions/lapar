@@ -187,3 +187,136 @@ from (values ('aminah', '1234'), ('ravi', '5678'), ('siti', '2468')) v (slug, pi
 join public.staff s on s.id = md5('staff:' || case when v.slug = 'siti' then 'b' else 'a' end || ':' || v.slug)::uuid;
 
 drop table _cat, _item, _group, _opt, _pair;
+
+-- ---------------------------------------------------------------------------
+-- History (card M2-E, DATA-MODEL 11): MYT days today-30 .. today-1, deterministic (setseed once, fixed call order).
+-- One closed tab per order, approved 1-3 min after creation, every line served, paid in full. Ids are md5('hist:...').
+-- ---------------------------------------------------------------------------
+create function pg_temp.hist_pick(p_slugs text[]) returns text language plpgsql as $$
+declare
+  v_w constant jsonb := '{"nasi-lemak":3,"roti-canai":3,"kaya-toast":2,"mee-goreng-mamak":2,"teh-tarik":3,"kopi":2}';
+  v_total numeric := 0; v_r numeric; v_s text;
+begin
+  foreach v_s in array p_slugs loop v_total := v_total + coalesce((v_w ->> v_s)::numeric, 1); end loop;
+  v_r := random() * v_total;
+  foreach v_s in array p_slugs loop
+    v_r := v_r - coalesce((v_w ->> v_s)::numeric, 1);
+    if v_r < 0 then return v_s; end if;
+  end loop;
+  return p_slugs[array_length(p_slugs, 1)];
+end $$;
+
+-- Inserts one served line (combo lines never get ready_at, like the real board) and returns its id and serve time.
+create function pg_temp.hist_line(p_k text, p_n int, p_order uuid, p_no int, p_item uuid, p_kind public.line_kind,
+  p_parent uuid, p_qty int, p_price int, p_from uuid, p_approved timestamptz, p_created timestamptz,
+  out o_id uuid, out o_served timestamptz)
+language plpgsql as $$
+declare v_item public.items; v_ready timestamptz; v_drink boolean;
+begin
+  select * into v_item from public.items where id = p_item;
+  v_drink := v_item.category_id = md5('cat:' || p_k || ':drinks')::uuid;
+  v_ready := p_approved + (case when v_drink then 2 + floor(random() * 4) else 3 + floor(random() * 13) end) * interval '1 minute';
+  o_served := v_ready + interval '1 minute';
+  o_id := md5('hist:line:' || p_k || ':' || p_n || ':' || p_no)::uuid;
+  insert into public.order_items (id, shop_id, order_id, line_no, kind, parent_line_id, item_id, name_snapshot, list_price_sen,
+    unit_price_sen, qty, station_id, status, status_changed_at, ready_at, served_at, suggested_from_item_id, created_at)
+  values (o_id, v_item.shop_id, p_order, p_no, p_kind, p_parent, v_item.id, v_item.name, p_price, p_price, p_qty, v_item.station_id,
+    'served', o_served, case when p_kind = 'combo' then null else v_ready end, o_served, p_from, p_created);
+end $$;
+
+do $$
+declare
+  v_pairs constant jsonb := '{"nasi-lemak":[["teh-tarik",0.6]],"roti-canai":[["teh-tarik",0.5],["extra-kari",0.3]],
+    "kaya-toast":[["half-boiled-eggs",0.7],["kopi",0.6]]}';
+  v_weights constant numeric[] := array[0,0,0,0,0,0,0, 3,5,4,1.5,2,5,5,2,1,1,1.5,3,3,2,0.5, 0,0]; -- per MYT hour 0..23
+  v_breakfast constant text[] := array['roti-canai','roti-telur','kaya-toast','half-boiled-eggs'];
+  v_mains constant text[] := array['nasi-lemak','nasi-lemak-ayam','nasi-goreng-kampung','nasi-ayam','mee-goreng-mamak','char-kuey-teow','mee-rebus'];
+  v_drinks constant text[] := array['teh-tarik','kopi','kopi-o','milo-ais','teh-o-ais-limau','sirap-bandung'];
+  v_sides constant text[] := array['telur-mata','ayam-goreng','extra-kari'];
+  v_k text; v_shop uuid; v_staff uuid; v_tables uuid[]; v_day date; v_cnt int; v_n int;
+  v_ago int; v_o int; v_l int; v_hr numeric; v_hour int; v_created timestamptz; v_approved timestamptz; v_last timestamptz;
+  v_slugs text[]; v_froms text[]; v_main text; v_has_drink boolean; v_p jsonb; v_side text;
+  v_tab uuid; v_order uuid; v_line record; v_comp record; v_no int; v_qty int; v_total int; v_item public.items;
+  v_method public.paid_method; v_round int; v_paid timestamptz; v_parent uuid; v_r numeric;
+begin
+  perform setseed(0.42);
+  foreach v_k in array array['a', 'b'] loop
+    v_shop := md5('shop:' || v_k)::uuid;
+    v_staff := md5('staff:' || v_k || ':' || case when v_k = 'a' then 'aminah' else 'siti' end)::uuid;
+    -- Table 2 of shop A stays free of history: 011_place_order asserts it has no orders or tabs.
+    v_tables := array(select id from public.tables where shop_id = v_shop and kind = 'table' and active
+      and id <> md5('table:a:02')::uuid order by sort);
+    v_n := 0;
+    for v_ago in reverse 30..1 loop
+      v_day := public.myt_today() - v_ago;
+      v_cnt := round((18 + floor(random() * 13)) * case when extract(isodow from v_day) >= 6 then 1.3 else 1 end);
+      for v_o in 1..v_cnt loop
+        v_n := v_n + 1;
+        v_hr := random() * (select sum(w) from unnest(v_weights) w);
+        v_hour := 0;
+        while v_hour < 23 and v_hr >= v_weights[v_hour + 1] loop v_hr := v_hr - v_weights[v_hour + 1]; v_hour := v_hour + 1; end loop;
+        v_created := (v_day::timestamp + make_interval(hours => v_hour, secs => floor(random() * 3600))) at time zone 'Asia/Kuala_Lumpur';
+        v_approved := v_created + make_interval(secs => 60 + floor(random() * 121));
+
+        v_main := pg_temp.hist_pick(case when v_hour < 11 then v_breakfast else v_mains end);
+        v_slugs := array[v_main]; v_froms := array[null::text]; v_has_drink := false;
+        for v_p in select value from jsonb_array_elements(coalesce(v_pairs -> v_main, '[]'::jsonb)) loop
+          if random() < (v_p ->> 1)::numeric then
+            v_slugs := v_slugs || (v_p ->> 0);
+            -- no suggestions from shop B nasi lemak: 011_place_order counts them
+            v_froms := v_froms || case when random() < 0.25 and not (v_k = 'b' and v_main = 'nasi-lemak') then v_main end;
+            v_has_drink := v_has_drink or (v_p ->> 0) = any (v_drinks);
+          end if;
+        end loop;
+        if not v_has_drink and random() < 0.8 then v_slugs := v_slugs || pg_temp.hist_pick(v_drinks); v_froms := v_froms || null::text; end if;
+        if random() < 0.3 then
+          v_side := pg_temp.hist_pick(v_sides);
+          if not v_side = any (v_slugs) then v_slugs := v_slugs || v_side; v_froms := v_froms || null::text; end if;
+        end if;
+        if v_k = 'b' and random() < 0.1 then
+          v_slugs := v_slugs || (case when random() < 0.5 then 'set-a' else 'set-b' end); v_froms := v_froms || null::text;
+        end if;
+
+        v_tab := md5('hist:tab:' || v_k || ':' || v_n)::uuid;
+        v_order := md5('hist:order:' || v_k || ':' || v_n)::uuid;
+        insert into public.tabs (id, shop_id, table_id, kind, status, opened_at, updated_at)
+          values (v_tab, v_shop, v_tables[1 + floor(random() * cardinality(v_tables))::int], 'table', 'open', v_created, v_created);
+        insert into public.orders (id, shop_id, tab_id, status, created_at, approved_at, approved_by_staff_id)
+          values (v_order, v_shop, v_tab, 'approved', v_created, v_approved, v_staff);
+
+        v_no := 0; v_total := 0; v_last := v_approved;
+        for v_l in 1..cardinality(v_slugs) loop
+          select * into v_item from public.items where id = md5('item:' || v_k || ':' || v_slugs[v_l])::uuid;
+          v_qty := case when random() < 0.12 then 2 else 1 end;
+          v_no := v_no + 1;
+          select * into v_line from pg_temp.hist_line(v_k, v_n, v_order, v_no, v_item.id,
+            (case when v_item.is_combo then 'combo' else 'item' end)::public.line_kind, null, v_qty, v_item.price_sen,
+            case when v_froms[v_l] is null then null else md5('item:' || v_k || ':' || v_froms[v_l])::uuid end, v_approved, v_created);
+          v_parent := v_line.o_id;
+          v_last := greatest(v_last, v_line.o_served);
+          v_total := v_total + v_qty * v_item.price_sen;
+          if v_item.is_combo then
+            for v_comp in select cc.item_id, cc.qty from public.combo_components cc where cc.combo_item_id = v_item.id order by cc.sort loop
+              v_no := v_no + 1;
+              select * into v_line from pg_temp.hist_line(v_k, v_n, v_order, v_no, v_comp.item_id, 'component', v_parent,
+                v_qty * v_comp.qty, 0, null, v_approved, v_created);
+              v_last := greatest(v_last, v_line.o_served);
+            end loop;
+          end if;
+        end loop;
+
+        v_r := random();
+        v_method := case when v_r < 0.6 then 'cash' when v_r < 0.9 then 'duitnow' else 'card' end;
+        v_round := case when v_method = 'cash' then public.round_cash(v_total) - v_total else 0 end;
+        v_paid := v_last + make_interval(mins => 1 + floor(random() * 4)::int);
+        insert into public.tab_payments (id, shop_id, tab_id, method, amount_sen, rounding_sen, created_at, created_by_staff_id)
+          values (md5('hist:pay:' || v_k || ':' || v_n)::uuid, v_shop, v_tab, v_method, v_total, v_round, v_paid, v_staff);
+        update public.tabs set status = 'closed', closed_at = v_paid, paid_total_sen = v_total, rounding_sen = v_round,
+          updated_at = v_paid where id = v_tab;
+      end loop;
+    end loop;
+  end loop;
+end $$;
+
+-- DATA-MODEL 11 ends the seed with `select public.refresh_auto_pairings();`. It is left out because 003 and 010 insert
+-- auto_pairings rows for shop B at fixed keys; 034_auto_pairings_cron calls it itself.

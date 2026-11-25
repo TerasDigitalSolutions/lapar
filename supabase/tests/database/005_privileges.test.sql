@@ -49,19 +49,23 @@ select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.prona
              and (p.proname in ('entitlements_of', 'limit_of', 'within_limit', 'default_station', 'current_staff_id',
                   'assert_member', 'assert_owner', 'assert_admin', 'assert_feature', 'next_pickup_no', 'tab_money',
                   'assert_report_window', 'refresh_auto_pairings', 'myt_today', 'in_window', 'round_cash', 'best_promo',
-                  'staff_session_json', 'staff_lines_of', 'board_lines', 'tab_summary')
+                  'staff_session_json', 'staff_lines_of', 'board_lines', 'tab_summary', 'pin_taken', 'sales_lines',
+                  'table_row_json', 'promo_row_json', 'menu_editor_of')
                   or p.proname like 'trg\_%')), 0::bigint,
   'authenticated cannot execute internal helpers or trigger functions');
 select is((select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['acknowledge_request', 'admin_clear_override', 'admin_create_shop', 'admin_get_platform_settings',
+  array['acknowledge_request', 'add_staff', 'admin_clear_override', 'admin_create_shop', 'admin_get_platform_settings',
         'admin_list_shops', 'admin_set_override', 'admin_set_plan', 'admin_set_platform_settings',
         'admin_set_shop_active', 'advance_item', 'approve_order', 'call_server', 'claim_staff_session',
-        'complete_request', 'current_shop_ids', 'end_staff_session', 'get_board', 'get_entitlements', 'get_menu',
-        'get_pending_orders', 'get_pickup_board', 'get_ready_lines', 'get_service_requests', 'get_sold_out_items',
-        'get_stations', 'get_tab', 'get_tab_detail', 'get_tables_overview', 'has_feature', 'is_member', 'is_owner',
+        'complete_request', 'current_shop_ids', 'end_staff_session', 'export_orders', 'export_shop_meta', 'get_board',
+        'get_daily_summary', 'get_entitlements', 'get_menu', 'get_menu_editor',
+        'get_pending_orders', 'get_pickup_board', 'get_ready_lines', 'get_sales_report', 'get_service_requests',
+        'get_shop_plan', 'get_sold_out_items', 'get_stations', 'get_tab', 'get_tab_detail', 'get_tables_overview',
+        'get_upsell_report', 'has_feature', 'is_member', 'is_owner',
         'is_platform_admin', 'my_shops', 'my_staff_session', 'new_token', 'place_order', 'record_payment',
-        'reject_order', 'set_item_sold_out', 'try_uuid'],
+        'regenerate_pickup_board_token', 'regenerate_table_token', 'reject_order', 'save_promo', 'set_board_columns',
+        'set_combo_components', 'set_item_pairings', 'set_item_sold_out', 'set_staff_pin', 'try_uuid', 'update_staff'],
   'authenticated executes exactly the granted helpers (grows with later migrations)');
 
 -- Behaviour as a signed-in owner
