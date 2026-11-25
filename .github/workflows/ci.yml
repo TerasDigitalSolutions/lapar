@@ -22,5 +22,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
 
-  # db:  # Supabase pgTAP tests, added in M2
-  #   runs-on: ubuntu-latest
+  db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+      # pgTAP needs the database plus auth and storage schemas (gotrue, storage-api)
+      - run: supabase start -x realtime,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - run: supabase test db
