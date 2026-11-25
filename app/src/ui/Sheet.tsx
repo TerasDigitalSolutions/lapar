@@ -53,7 +53,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-xl sm:rounded-3xl"
+        className="relative flex max-h-[90%] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-xl sm:rounded-3xl"
       >
         <div className="flex items-center justify-between gap-2 border-b border-stone-200 py-2 pr-2 pl-5">
           <h2 id={titleId} className="text-lg font-bold text-stone-900">

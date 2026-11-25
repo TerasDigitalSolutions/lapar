@@ -37,3 +37,17 @@ export function removeKey(key: string, kind: StorageArea = 'local'): void {
     /* ignore */
   }
 }
+
+/** Removes every `lapar:` / `lapar.` key from both storages (customer tabs, carts, device settings). Other keys, e.g. the demo state, stay. */
+export function clearAppKeys(): void {
+  for (const kind of ['local', 'session'] as const) {
+    try {
+      const storage = area(kind);
+      if (!storage) continue;
+      const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((k): k is string => !!k && /^lapar[:.]/.test(k));
+      keys.forEach((k) => storage.removeItem(k));
+    } catch {
+      /* ignore */
+    }
+  }
+}

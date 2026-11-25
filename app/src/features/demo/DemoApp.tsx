@@ -8,8 +8,13 @@ import { ConfirmDialog, Button, ProLocked, ToastProvider, useToast, inputClass }
 import { CustomerView } from '../customer/CustomerView';
 import { ManagerView } from '../manager/ManagerView';
 import { StaffView } from '../staff/StaffView';
+import { clearAppKeys } from '../../lib/storage';
 import { useDemoT } from './messages';
 import { startRush } from './rush';
+
+/** The rush backdates a few orders by moving the demo clock for a moment. */
+let skewMs = 0;
+const now = () => new Date(Date.now() + skewMs);
 
 type View = 'customer' | 'staff' | 'manager';
 const CLOCKS: DemoClock[] = ['real', 'breakfast', 'lunch', 'afternoon'];
@@ -37,6 +42,15 @@ function Select({ label, value, onChange, children, grow = false }: { label: str
   );
 }
 
+/** The transform makes `fixed` children (cart bar, sheets) relative to the pane; the inner element does the scrolling so they stay put. */
+function Pane({ className, children }: { className: string; children: ReactNode }) {
+  return (
+    <div className={`relative overflow-hidden bg-white [transform:translateZ(0)] ${className}`}>
+      <div className="h-full overflow-auto">{children}</div>
+    </div>
+  );
+}
+
 /** Toasts for activity in views the partner is not looking at: new orders waiting for approval and calls. */
 function useActivityToasts(demo: LaparDemoData, staffVisible: boolean, resetKey: number) {
   const toast = useToast();
@@ -49,6 +63,7 @@ function useActivityToasts(demo: LaparDemoData, staffVisible: boolean, resetKey:
   });
   useEffect(() => {
     let seen: Set<string> | null = null;
+    const toasted = new Set<string>(); // a repeat tap on the same call changes updatedAt but must not toast again
     let alive = true;
     const check = async () => {
       const [orders, calls] = await Promise.all([demo.staff.listPendingOrders(demo.shopId), demo.staff.listServiceRequests(demo.shopId)]);
@@ -56,8 +71,9 @@ function useActivityToasts(demo: LaparDemoData, staffVisible: boolean, resetKey:
       const ids = new Set([...orders.map((o) => o.orderId), ...calls.map((c) => `${c.id}:${c.updatedAt}`)]);
       if (seen && !visible.current) {
         for (const o of orders) if (!seen.has(o.orderId)) toast(tRef.current('toast_order', { table: o.tableLabel }));
-        for (const c of calls) if (!seen.has(`${c.id}:${c.updatedAt}`)) toast(tRef.current(`toast_call_${c.reason}`, { table: c.tableLabel }));
+        for (const c of calls) if (!seen.has(`${c.id}:${c.updatedAt}`) && !toasted.has(c.id)) toast(tRef.current(`toast_call_${c.reason}`, { table: c.tableLabel }));
       }
+      for (const c of calls) toasted.add(c.id);
       seen = ids;
     };
     void check();
@@ -104,7 +120,7 @@ function Shell({ demo }: { demo: LaparDemoData }) {
       stopRush();
       setStopRush(null);
     } else {
-      setStopRush(() => startRush(demo, activeToken, () => setStopRush(null)));
+      setStopRush(() => startRush(demo, activeToken, () => setStopRush(null), (ms) => (skewMs = ms)));
     }
   };
 
@@ -167,10 +183,10 @@ function Shell({ demo }: { demo: LaparDemoData }) {
                       </option>
                     ))}
                   </Select>
-                  <div className="min-h-0 flex-1 overflow-auto [transform:translateZ(0)] rounded-[2rem] border-8 border-stone-800 bg-white shadow-xl">{customer}</div>
+                  <Pane className="min-h-0 flex-1 rounded-[2rem] border-8 border-stone-800 shadow-xl">{customer}</Pane>
                 </section>
-                <section aria-label={view === 'manager' ? t('manager_pane') : t('staff_pane')} className="min-w-0 flex-1 overflow-auto [transform:translateZ(0)] rounded-2xl bg-white shadow">
-                  {side}
+                <section aria-label={view === 'manager' ? t('manager_pane') : t('staff_pane')} className="min-w-0 flex-1">
+                  <Pane className="h-full rounded-2xl shadow">{side}</Pane>
                 </section>
               </div>
             ) : (
@@ -186,7 +202,7 @@ function Shell({ demo }: { demo: LaparDemoData }) {
                     </Select>
                   </div>
                 )}
-                <div className="min-h-0 flex-1 overflow-auto bg-white [transform:translateZ(0)]">{view === 'customer' ? customer : side}</div>
+                <Pane className="min-h-0 flex-1">{view === 'customer' ? customer : side}</Pane>
               </div>
             )}
           </EntitlementsProvider>
@@ -203,6 +219,7 @@ function Shell({ demo }: { demo: LaparDemoData }) {
           stopRush?.();
           setStopRush(null);
           demo.reset();
+          clearAppKeys();
           setResetKey((k) => k + 1);
           setConfirmReset(false);
         }}
@@ -214,7 +231,7 @@ function Shell({ demo }: { demo: LaparDemoData }) {
 }
 
 export function DemoApp() {
-  const demo = useMemo(() => createDemoData(), []);
+  const demo = useMemo(() => createDemoData({ now }), []);
   return (
     <DataProvider value={demo}>
       <ProCtaProvider value={{ kind: 'demo' }}>

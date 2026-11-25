@@ -64,9 +64,15 @@ test('phone: one view at a time and a toast for activity in the hidden view', as
 test('simulate rush brings in orders from other tables, and Stop ends it', async ({ page }, info) => {
   await open(page, 'Customer');
   await page.getByRole('button', { name: 'Simulate rush' }).click();
-  // Narrow screens toast; wide screens show the order on the staff pane.
-  const sign = info.project.name === 'phone' ? page.getByRole('status').getByText(/New order from Table|: bill please|: water|: needs help/) : page.getByRole('button', { name: 'Approve' });
-  await expect(sign.first()).toBeVisible({ timeout: 15_000 });
+  // Narrow screens toast; wide screens show the rush's orders on the kitchen board (most are approved).
+  if (info.project.name === 'phone') {
+    await expect(page.getByRole('status').getByText(/New order from Table|: bill please|: water|: needs help/).first()).toBeVisible({ timeout: 15_000 });
+  } else {
+    const staff = page.getByRole('region', { name: 'Staff and kitchen' });
+    await staff.getByRole('tab', { name: 'Kitchen' }).click();
+    await staff.getByRole('button', { name: 'Start shift' }).click();
+    await expect(staff.getByRole('button', { name: /Tap/ }).first()).toBeVisible({ timeout: 15_000 });
+  }
   await page.getByRole('button', { name: 'Stop' }).click();
   await expect(page.getByRole('button', { name: 'Simulate rush' })).toBeVisible();
 });
