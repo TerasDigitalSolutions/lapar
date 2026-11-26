@@ -110,8 +110,9 @@ export function seedState(nowIso: string): DemoState {
       description: '',
       translations,
       priceSen,
-      photoUrl: null,
-      photoState: 'none',
+      // AI-generated demo photos in app/public/demo/menu (DECISIONS Q6); resolved against the site base.
+      photoUrl: `demo/menu/${slug}.webp`,
+      photoState: 'published',
       active: true,
       soldOut: false,
       isCombo: cat === 'sets',
