@@ -84,6 +84,31 @@ const PAIRINGS: Record<string, string[]> = {
   'kaya-toast': ['half-boiled-eggs', 'kopi'],
 };
 
+const DESCRIPTIONS: Record<string, string> = {
+  'set-a': 'Nasi lemak with a glass of teh tarik',
+  'set-b': 'Roti canai with a hot cup of kopi',
+  'teh-tarik': 'Pulled milk tea, sweet, strong and frothy',
+  kopi: 'Kopitiam coffee brewed strong with condensed milk',
+  'kopi-o': 'Black kopitiam coffee with sugar',
+  'milo-ais': 'Iced Milo, rich, chocolatey and cold',
+  'teh-o-ais-limau': 'Iced black tea with a squeeze of lime',
+  'sirap-bandung': 'Rose syrup and milk over ice',
+  'roti-canai': 'Crisp, flaky flatbread with dhal or curry',
+  'roti-telur': 'Flaky flatbread cooked with an egg inside',
+  'kaya-toast': 'Charcoal toast with kaya and a slab of butter',
+  'half-boiled-eggs': 'Two soft eggs with soy sauce and white pepper',
+  'nasi-lemak': 'Coconut rice, sambal, anchovies, peanuts, egg and cucumber',
+  'nasi-lemak-ayam': 'Nasi lemak with crisp fried chicken',
+  'nasi-goreng-kampung': 'Village-style fried rice with anchovies and greens',
+  'nasi-ayam': 'Poached chicken on fragrant rice with chilli sauce',
+  'mee-goreng-mamak': 'Spicy mamak-style fried noodles with egg and tofu',
+  'char-kuey-teow': 'Wok-fried flat noodles, prawns, egg and bean sprouts',
+  'mee-rebus': 'Noodles in a sweet, thick potato gravy',
+  'telur-mata': 'Fried sunny-side-up egg',
+  'ayam-goreng': 'Crispy fried chicken, spiced and golden',
+  'extra-kari': 'A small bowl of extra curry gravy',
+};
+
 const DRINK_ITEMS = new Set(['teh-tarik', 'kopi', 'kopi-o', 'milo-ais', 'teh-o-ais-limau', 'sirap-bandung']);
 
 export function seedState(nowIso: string): DemoState {
@@ -107,7 +132,7 @@ export function seedState(nowIso: string): DemoState {
       categoryId: `cat-${cat}`,
       stationId: DRINK_ITEMS.has(slug) ? DRINKS_STATION_ID : KITCHEN_ID,
       name,
-      description: '',
+      description: DESCRIPTIONS[slug] ?? '',
       translations,
       priceSen,
       // AI-generated demo photos in app/public/demo/menu (DECISIONS Q6); resolved against the site base.
@@ -162,6 +187,7 @@ export function seedState(nowIso: string): DemoState {
       planId: 'basic',
       approvalMode: 'first_order',
       nudgeCategoryId: 'cat-drinks',
+      theme: 'kopitiam',
       active: true,
       pickupBoardToken: PICKUP_BOARD_TOKEN,
       createdAt: nowIso,

@@ -145,9 +145,12 @@ export interface LineOption {
 // ---------------------------------------------------------------------------------------------
 
 /** RPC get_menu(p_table_token). One call loads the whole customer page. */
+export type ShopTheme = 'kopitiam' | 'pandan' | 'teh-tarik' | 'malam';
+
 export interface MenuDTO {
   shop: {
     id: Uuid;
+    theme: ShopTheme;
     name: string;
     slug: string;
     logoUrl: string | null;
@@ -328,6 +331,7 @@ export interface CustomerLineDTO {
 /** RPC get_pickup_board(p_board_token) (Pro: takeaway). Numbers only, no personal data. */
 export interface PickupBoardDTO {
   shopName: string;
+  theme: ShopTheme;
   /** Today's (MYT) approved counter tabs not yet fully ready. Ascending. */
   preparing: number[];
   /** All lines ready (or served) but not all served yet. Ascending. */
@@ -351,6 +355,7 @@ export interface StaffSession {
   shopId: Uuid;
   shopName: string;
   shopSlug: string;
+  shopTheme: ShopTheme;
   staffId: Uuid;
   staffName: string;
   expiresAt: IsoDateTime;
@@ -365,6 +370,7 @@ export interface OwnerShopDTO {
   slug: string;
   active: boolean;
   planId: PlanId;
+  theme: ShopTheme;
 }
 
 /** Owner invite links are verified as 'email'; password reset links as 'recovery'. */
@@ -568,13 +574,14 @@ export interface ShopSettings {
   planId: PlanId;
   approvalMode: ApprovalMode;
   nudgeCategoryId: Uuid | null;
+  theme: ShopTheme;
   active: boolean;
   /** Pickup board token (Pro: takeaway); null until generated. */
   pickupBoardToken: string | null;
   createdAt: IsoDateTime;
 }
 
-export type ShopSettingsPatch = Partial<Pick<ShopSettings, 'name' | 'logoUrl' | 'approvalMode' | 'nudgeCategoryId'>>;
+export type ShopSettingsPatch = Partial<Pick<ShopSettings, 'name' | 'logoUrl' | 'approvalMode' | 'nudgeCategoryId' | 'theme'>>;
 
 export interface StationRow {
   id: Uuid;

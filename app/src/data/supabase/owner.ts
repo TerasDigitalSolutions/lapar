@@ -53,6 +53,7 @@ export const ownerApi: OwnerApi = {
       logo_url: patch.logoUrl,
       approval_mode: patch.approvalMode,
       nudge_category_id: patch.nudgeCategoryId,
+      theme: patch.theme,
     });
     if (Object.keys(columns).length) await run((c) => c.from('shops').update(columns).eq('id', shopId));
   },

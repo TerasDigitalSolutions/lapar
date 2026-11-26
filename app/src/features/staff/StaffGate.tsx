@@ -41,7 +41,7 @@ function PinGate() {
           {t('sign_out')}
         </Button>
       </div>
-      <ShopShell shopId={session.shopId}>
+      <ShopShell shopId={session.shopId} theme={session.shopTheme}>
         <StaffView shopId={session.shopId} />
       </ShopShell>
     </>
@@ -53,7 +53,7 @@ export function StaffGate() {
   return (
     <OwnerGate signedOut={<PinGate />}>
       {(shop) => (
-        <ShopShell shopId={shop.id}>
+        <ShopShell shopId={shop.id} theme={shop.theme}>
           <StaffView shopId={shop.id} />
         </ShopShell>
       )}

@@ -120,7 +120,7 @@ select is((select count(*) from public.staff_sessions where auth_uid = md5('user
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', md5('user:owner-a')::uuid, 'role', 'authenticated')::text, true);
 select is(public.my_shops(), jsonb_build_array(jsonb_build_object('id', md5('shop:a')::uuid, 'name', 'Kopitiam Teras', 'slug', 'kopitiam-teras',
-  'active', true, 'planId', 'basic')), 'my_shops lists the owned shop');
+  'active', true, 'planId', 'basic', 'theme', 'kopitiam')), 'my_shops lists the owned shop');
 select set_config('request.jwt.claims', json_build_object('sub', md5('user:outsider')::uuid, 'role', 'authenticated')::text, true);
 select is(public.my_shops(), '[]'::jsonb, 'outsider owns no shops');
 

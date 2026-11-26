@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useData } from '../../data/context';
+import type { ShopTheme } from '../../data/types';
 import { ProCtaProvider, useEntitlements, useFeature, useProCta, type ProCta } from '../../entitlements/hooks';
 import type { FeatureKey } from '../../entitlements/keys';
 import { focusRing, ProBadge } from '../../ui';
@@ -52,7 +53,7 @@ function ProNavButton({ id, feature, label, current, onPick }: { id: SectionId; 
 }
 
 /** Owner screens. Needs ToastProvider, DataProvider and EntitlementsProvider above it. */
-export function ManagerView({ shopId }: { shopId: string }) {
+export function ManagerView({ shopId, onTheme }: { shopId: string; onTheme?: (theme: ShopTheme) => void }) {
   const t = useManagerT();
   const api = useData();
   const outer = useProCta();
@@ -84,7 +85,7 @@ export function ManagerView({ shopId }: { shopId: string }) {
     menu: <MenuSection shopId={shopId} />,
     tables: <TablesSection shopId={shopId} />,
     staff: <StaffSection shopId={shopId} />,
-    settings: <SettingsSection shopId={shopId} />,
+    settings: <SettingsSection shopId={shopId} onTheme={onTheme} />,
     plan: <PlanSection shopId={shopId} />,
     reports: <ReportsSection shopId={shopId} />,
     upsell: <UpsellSection shopId={shopId} />,

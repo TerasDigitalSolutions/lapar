@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useData } from '../../data/context';
-import type { ApprovalMode, ShopSettings } from '../../data/types';
+import type { ApprovalMode, ShopSettings, ShopTheme } from '../../data/types';
 import { resizeImage } from '../../lib/image';
+import { THEMES } from '../../lib/theme';
 import { Button, ErrorState, Field, inputClass, Loading, PhotoTile, Segmented } from '../../ui';
 import { useAct, useLoad } from './hooks';
 import { useManagerT } from './messages';
@@ -9,7 +10,7 @@ import { Card, Heading } from './parts';
 
 const NAME_MAX = 80;
 
-function SettingsForm({ shop, onSaved }: { shop: ShopSettings; onSaved: () => void }) {
+function SettingsForm({ shop, onSaved, onTheme }: { shop: ShopSettings; onSaved: () => void; onTheme?: (theme: ShopTheme) => void }) {
   const t = useManagerT();
   const api = useData();
   const { run, busy } = useAct();
@@ -23,6 +24,13 @@ function SettingsForm({ shop, onSaved }: { shop: ShopSettings; onSaved: () => vo
     setError(err);
     if (err) return;
     if (await run(() => api.owner.updateShopSettings(shop.id, { name: clean, approvalMode: mode }), t('saved'))) onSaved();
+  };
+
+  const pickTheme = async (theme: ShopTheme) => {
+    if (await run(() => api.owner.updateShopSettings(shop.id, { theme }), t('saved'))) {
+      onTheme?.(theme);
+      onSaved();
+    }
   };
 
   const pickLogo = async (file: File | undefined) => {
@@ -69,6 +77,24 @@ function SettingsForm({ shop, onSaved }: { shop: ShopSettings; onSaved: () => vo
           </Button>
         </form>
       </Card>
+      <Card>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-base font-semibold text-stone-800">{t('theme_title')}</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {THEMES.map(({ id, swatch }) => (
+              <label key={id} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 has-checked:border-2 has-checked:border-orange-600 has-checked:bg-orange-50 has-focus-visible:outline-2 has-focus-visible:outline-orange-600">
+                <input type="radio" name="theme" className="sr-only" value={id} checked={shop.theme === id} disabled={busy} onChange={() => void pickTheme(id)} />
+                <span className="flex gap-1" aria-hidden="true">
+                  {swatch.map((c) => (
+                    <span key={c} className="size-4 rounded-full border border-stone-300" style={{ backgroundColor: c }} />
+                  ))}
+                </span>
+                <span className="text-base font-medium text-stone-900">{t(`theme_${id}`)}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </Card>
       <Card className="flex items-center gap-4">
         <PhotoTile url={shop.logoUrl} name={shop.name} className="size-20" />
         <div className="flex flex-col gap-2">
@@ -83,9 +109,9 @@ function SettingsForm({ shop, onSaved }: { shop: ShopSettings; onSaved: () => vo
   );
 }
 
-export function SettingsSection({ shopId }: { shopId: string }) {
+export function SettingsSection({ shopId, onTheme }: { shopId: string; onTheme?: (theme: ShopTheme) => void }) {
   const api = useData();
   const q = useLoad(() => api.owner.getShopSettings(shopId), shopId);
   if (!q.data) return q.error ? <ErrorState error={q.error} onRetry={q.reload} /> : <Loading />;
-  return <SettingsForm key={q.data.name + q.data.approvalMode + (q.data.logoUrl ?? '')} shop={q.data} onSaved={q.reload} />;
+  return <SettingsForm key={q.data.name + q.data.approvalMode + q.data.theme + (q.data.logoUrl ?? '')} shop={q.data} onSaved={q.reload} onTheme={onTheme} />;
 }

@@ -191,3 +191,14 @@ test('Pro sections show a lock on Basic and open on Pro', async () => {
   fireEvent.click(screen.getByRole('button', { name: /Reports/ }));
   expect(await screen.findByRole('heading', { name: 'Sales by day' })).toBeTruthy();
 });
+
+test('picking a color theme saves it', async () => {
+  const d = setup();
+  open('Settings');
+  const group = await screen.findByRole('group', { name: 'Color theme' });
+  expect((within(group).getByRole('radio', { name: /Kopitiam/ }) as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(within(group).getByRole('radio', { name: /Pandan/ }));
+  await waitFor(async () => expect((await d.owner.getShopSettings(SHOP)).theme).toBe('pandan'));
+  expect(await screen.findByText('Saved')).toBeTruthy();
+  expect((within(screen.getByRole('group', { name: 'Color theme' })).getByRole('radio', { name: /Pandan/ }) as HTMLInputElement).checked).toBe(true);
+});

@@ -16,6 +16,7 @@ export function createAuthApi(ctx: Ctx): AuthApi {
           shopId: s.shop.id,
           shopName: s.shop.name,
           shopSlug: s.shop.slug,
+          shopTheme: s.shop.theme,
           staffId: member.id,
           staffName: member.name,
           expiresAt: new Date(ctx.now().getTime() + SESSION_MS).toISOString(),
@@ -75,7 +76,7 @@ export function createAuthApi(ctx: Ctx): AuthApi {
 
     async myShops() {
       const { shop, plan } = ctx.s;
-      return [{ id: shop.id, name: shop.name, slug: shop.slug, active: shop.active, planId: plan }];
+      return [{ id: shop.id, name: shop.name, slug: shop.slug, active: shop.active, planId: plan, theme: shop.theme }];
     },
     async isPlatformAdmin() {
       return true;

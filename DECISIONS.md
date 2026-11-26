@@ -63,6 +63,7 @@ Newest first within each section. Each entry: what was decided, why, and where i
 | D41 | The first platform admin is created by one SQL insert during setup; everything after that goes through `#/admin`. | Bootstrapping needs one privileged step. | ARCHITECTURE 13 |
 | D42 | Staging bucket: public, 2 MB per file, WebP and JPEG only. | Browser already resizes to ≤ 1200 px. | DATA-MODEL 9 |
 | D43 | Brief column renames/additions: `orders.approved_by` → `approved_by_staff_id` (null when an owner approves or the order needs no approval); new columns for Pro (`tables.kind`, `tabs.kind/pickup_no/pickup_at`, `items.is_combo`, `translations`, category windows, `order_items.kind/line_no/parent_line_id/list_price_sen/promo_id/column_id/ready_at/served_at/paid_payment_id`). | Staff approve from anonymous device users, so the staff id is the useful record. | DATA-MODEL 3 |
+| D44 | Each shop has one of four color themes, picked by the owner; default kopitiam. | Shops can look like themselves; one column, sent to every screen that shows the shop (`get_menu`, `get_pickup_board`, staff session, `my_shops`). | DATA-MODEL 3 |
 
 ## 2026-11-25 — Build decisions (orchestrator)
 

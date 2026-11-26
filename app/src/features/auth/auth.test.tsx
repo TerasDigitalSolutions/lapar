@@ -8,8 +8,8 @@ import { StaffGate } from '../staff/StaffGate';
 import { WelcomeView } from './WelcomeView';
 
 const SHOP = 'shop-kopitiam-teras';
-const shop: OwnerShopDTO = { id: SHOP, name: 'Kopitiam Teras', slug: 'kopitiam', active: true, planId: 'basic' };
-const session: StaffSession = { shopId: SHOP, shopName: 'Kopitiam Teras', shopSlug: 'kopitiam', staffId: 's1', staffName: 'Ravi', expiresAt: new Date(Date.now() + 3600_000).toISOString(), pickupBoardToken: null };
+const shop: OwnerShopDTO = { id: SHOP, name: 'Kopitiam Teras', slug: 'kopitiam', active: true, planId: 'basic', theme: 'kopitiam' };
+const session: StaffSession = { shopId: SHOP, shopName: 'Kopitiam Teras', shopSlug: 'kopitiam', shopTheme: 'kopitiam', staffId: 's1', staffName: 'Ravi', expiresAt: new Date(Date.now() + 3600_000).toISOString(), pickupBoardToken: null };
 const owner: AuthUser = { id: 'u1', email: 'o@example.test', isAnonymous: false };
 
 /** Demo data with a scripted auth API: the sign-in logic is what these tests exercise. */

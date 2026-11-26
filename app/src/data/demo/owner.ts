@@ -42,6 +42,7 @@ async function resizedDataUrl(file: Blob): Promise<string> {
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const PIN = /^[0-9]{4,6}$/;
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const THEME_IDS = ['kopitiam', 'pandan', 'teh-tarik', 'malam'];
 const APPROVAL = ['every_order', 'first_order', 'none'];
 
 function checkWindow(w: TimeWindow | null | undefined): TimeWindow | null {
@@ -94,6 +95,10 @@ export function createOwnerApi(ctx: Ctx): OwnerApi {
       if (patch.nudgeCategoryId !== undefined) {
         if (patch.nudgeCategoryId !== null && !s().categories.some((c) => c.id === patch.nudgeCategoryId)) fail('invalid_input', 'nudge_category_id');
         next.nudgeCategoryId = patch.nudgeCategoryId;
+      }
+      if (patch.theme !== undefined) {
+        if (!THEME_IDS.includes(patch.theme)) fail('invalid_input', 'theme');
+        next.theme = patch.theme;
       }
       Object.assign(shop, next);
       ctx.emit();

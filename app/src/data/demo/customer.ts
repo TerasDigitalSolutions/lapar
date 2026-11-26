@@ -58,6 +58,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         slug: s.shop.slug,
         logoUrl: s.shop.logoUrl,
         active: s.shop.active,
+        theme: s.shop.theme,
         nudgeCategoryId: features.checkout_nudge ? s.shop.nudgeCategoryId : null,
       };
       const base = { shop, table: { label: table.label, kind: table.kind }, features, serverNow: nowIso(ctx) };
@@ -371,7 +372,7 @@ export function createCustomerApi(ctx: Ctx): CustomerApi {
         else if (lines.some((l) => l.status === 'ready')) ready.push(tab.pickupNo);
       }
       const asc = (a: number, b: number) => a - b;
-      return { shopName: s.shop.name, preparing: preparing.sort(asc), ready: ready.sort(asc), serverNow: nowIso(ctx) };
+      return { shopName: s.shop.name, theme: s.shop.theme, preparing: preparing.sort(asc), ready: ready.sort(asc), serverNow: nowIso(ctx) };
     },
   };
 }

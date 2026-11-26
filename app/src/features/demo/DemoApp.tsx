@@ -2,13 +2,14 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { DataProvider } from '../../data/context';
 import { createDemoData } from '../../data/demo';
-import type { DemoClock, Entitlements, LaparDemoData, PlanId } from '../../data/types';
+import type { DemoClock, Entitlements, LaparDemoData, PlanId, ShopTheme } from '../../data/types';
 import { EntitlementsProvider, ProCtaProvider } from '../../entitlements/hooks';
 import { ConfirmDialog, Button, ProLocked, ToastProvider, useToast, inputClass } from '../../ui';
 import { CustomerView } from '../customer/CustomerView';
 import { ManagerView } from '../manager/ManagerView';
 import { StaffView } from '../staff/StaffView';
 import { clearAppKeys } from '../../lib/storage';
+import { THEMES, useShopTheme } from '../../lib/theme';
 import { useDemoT } from './messages';
 import { startRush } from './rush';
 
@@ -95,6 +96,8 @@ function Shell({ demo }: { demo: LaparDemoData }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [stopRush, setStopRush] = useState<(() => void) | null>(null);
+  const [theme, setTheme] = useState<ShopTheme>('kopitiam');
+  useShopTheme(theme);
   const plan = demo.getPlan();
   const pro = plan === 'pro';
 
@@ -106,6 +109,16 @@ function Shell({ demo }: { demo: LaparDemoData }) {
       live = false;
     };
   }, [demo, plan]);
+  useEffect(() => {
+    let live = true;
+    const load = () => void demo.owner.getShopSettings(demo.shopId).then((s) => live && setTheme(s.theme));
+    load();
+    const off = demo.onChange(load);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [demo]);
   useEffect(() => () => stopRush?.(), [stopRush]);
 
   const staffVisible = wide ? view !== 'manager' : view === 'staff';
@@ -149,6 +162,13 @@ function Shell({ demo }: { demo: LaparDemoData }) {
               <option value="customer">{t('view_customer')}</option>
               <option value="staff">{t('view_staff')}</option>
               <option value="manager">{t('view_manager')}</option>
+            </Select>
+            <Select grow label={t('theme')} value={theme} onChange={(v) => void demo.owner.updateShopSettings(demo.shopId, { theme: v as ShopTheme })}>
+              {THEMES.map(({ id }) => (
+                <option key={id} value={id}>
+                  {t(`theme_${id}`)}
+                </option>
+              ))}
             </Select>
             <div className="flex min-w-0 flex-1 flex-col text-xs font-semibold text-stone-600">
               {pro ? (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useData } from '../../data/context';
 import { toLaparError, usePolling } from '../../data/hooks';
 import type { LaparError, PickupBoardDTO } from '../../data/types';
+import { useShopTheme } from '../../lib/theme';
 import { getLocale, setLocale, type Locale } from '../../i18n';
 import { Button, Loading, Segmented } from '../../ui';
 import { useT } from './messages';
@@ -13,6 +14,7 @@ export function PickupBoardView({ boardToken }: { boardToken: string }) {
   const [board, setBoard] = useState<PickupBoardDTO | null>(null);
   const [error, setError] = useState<LaparError | null>(null);
   const [full, setFull] = useState(false);
+  useShopTheme(board?.theme);
 
   const load = useCallback(
     () =>

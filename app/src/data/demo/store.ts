@@ -31,7 +31,7 @@ import type {
 } from '../types';
 
 export const STORAGE_KEY = 'lapar-demo-v1';
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 /** Generated history rows carry this id prefix; they are never persisted. */
 export const HISTORY_PREFIX = 'hist-';
 
