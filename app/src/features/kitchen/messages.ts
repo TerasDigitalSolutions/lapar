@@ -12,7 +12,7 @@ type Key =
 export const useKitchenT = defineMessages<Key>('kitchen', {
   en: {
     start_title: 'Kitchen board',
-    start_body: 'Tap to turn on sound, keep the screen awake and go full screen.',
+    start_body: 'Tap to turn on sound and keep the screen awake.',
     start_button: 'Start shift',
     banner_sound: 'Sound is off. You will not hear new orders.',
     banner_sound_action: 'Turn on sound',

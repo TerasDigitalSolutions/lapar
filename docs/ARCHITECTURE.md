@@ -165,7 +165,7 @@ One browser holds one Supabase session: signing in as owner on a staff device en
 
 ## 9. Kitchen tablet and alerts
 
-- `KitchenView` shows a full-screen **Start shift** button once per page load: resumes the shared `AudioContext` (`lib/audio.ts`), requests a screen wake lock (again on every `visibilitychange` → visible), enters fullscreen.
+- `KitchenView` shows a full-screen **Start shift** button once per page load: resumes the shared `AudioContext` (`lib/audio.ts`), requests a screen wake lock (again on every `visibilitychange` → visible), (no fullscreen).
 - Banners: sound off (AudioContext not running), wake lock unavailable, connection offline.
 - Staff alerts (`StaffView`): WebAudio beeps (orders: two short high tones; calls: one long low tone) plus `navigator.vibrate`, on a new pending order or call, repeated every 30 s while any stays unhandled. Staff phones show "Tap to enable sound" until audio is unlocked.
 - Card colours from minutes since `approvedAt` (server-clock corrected with `serverNow`): amber ≥ 10, red ≥ 20.

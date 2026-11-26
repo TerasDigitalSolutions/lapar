@@ -111,11 +111,6 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
     shiftStarted = true;
     setStarted(true);
     void enableSound();
-    try {
-      await document.documentElement.requestFullscreen?.();
-    } catch {
-      /* fullscreen is optional */
-    }
   };
 
   const advance = async (line: BoardLineDTO, move: Move) => {
