@@ -48,9 +48,9 @@ export function KitchenView({ shopId }: { shopId: string }) {
 
 const CORE_KEY = { new: 'col_new', preparing: 'col_preparing', cooking: 'col_cooking', ready: 'col_ready' } as const;
 const AGE_STYLE: Record<AgeClass, string> = {
-  ok: 'border-stone-400 bg-white text-stone-950',
-  amber: 'border-amber-700 bg-amber-300 text-stone-950',
-  red: 'border-red-950 bg-red-700 text-white',
+  ok: 'border-stone-400 bg-white text-stone-950 shadow-md',
+  amber: 'border-amber-700 bg-amber-300 text-stone-950 shadow-md',
+  red: 'border-red-950 bg-red-700 text-white shadow-md',
 };
 
 function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: string; stationId: string | null; stations: StationRow[]; onStation: (id: string) => void }) {
@@ -171,7 +171,7 @@ function KitchenBoard({ shopId, stationId, stations, onStation }: { shopId: stri
           const nextName = nextCol ? colName(nextCol) : t('served');
           return (
             <section key={col.id ?? col.coreStatus} aria-label={colName(col)} className="flex min-w-0 flex-1 flex-col gap-3">
-              <h2 className="rounded-xl bg-stone-900 px-4 py-3 text-2xl font-extrabold text-white">
+              <h2 className="rounded-2xl border-l-8 border-orange-600 bg-stone-900 px-4 py-3 text-2xl font-extrabold text-white shadow-md">
                 {colName(col)} <span className="opacity-70">({lines.length})</span>
               </h2>
               {lines.length === 0 && <p className="px-2 text-lg text-stone-600">{t('empty_column')}</p>}

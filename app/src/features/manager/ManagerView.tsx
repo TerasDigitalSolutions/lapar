@@ -36,8 +36,8 @@ function NavButton({ id, label, current, onPick, lock }: { id: SectionId; label:
       type="button"
       aria-current={selected ? 'page' : undefined}
       onClick={() => onPick(id)}
-      className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl px-4 text-base font-semibold ${focusRing} ${
-        selected ? 'bg-orange-600 text-white' : 'bg-stone-200 text-stone-900 hover:bg-stone-300'
+      className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-2xl px-4 text-base font-semibold ${focusRing} ${
+        selected ? 'bg-orange-600 text-white shadow-md' : 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200 hover:bg-stone-100'
       }`}
     >
       {label}

@@ -18,7 +18,7 @@ export function PhotoTile({ url, name, className = 'size-20' }: { url: string | 
   const [failed, setFailed] = useState<string | null>(null);
   const showImg = src && failed !== src;
   return (
-    <div className={`relative shrink-0 overflow-hidden rounded-xl bg-orange-100 ${className}`}>
+    <div className={`relative shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 ${className}`}>
       {showImg ? (
         <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(src)} className="size-full object-cover" />
       ) : (

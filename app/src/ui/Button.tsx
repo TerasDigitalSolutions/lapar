@@ -3,9 +3,9 @@ import type { ComponentProps } from 'react';
 export const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600';
 
 const variants = {
-  primary: 'bg-orange-600 text-white hover:bg-orange-700 active:bg-orange-800',
-  secondary: 'border border-stone-300 bg-white text-stone-900 hover:bg-stone-50 active:bg-stone-100',
-  danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
+  primary: 'bg-orange-600 text-white shadow-sm hover:bg-orange-700 active:bg-orange-800',
+  secondary: 'border border-stone-300 bg-white text-stone-900 shadow-sm hover:bg-stone-50 active:bg-stone-100',
+  danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800',
   ghost: 'text-stone-800 hover:bg-stone-100 active:bg-stone-200',
 } as const;
 
@@ -21,7 +21,7 @@ export function Button({ variant = 'primary', block, className = '', type = 'but
   return (
     <button
       type={type}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${variants[variant]} ${block ? 'w-full' : ''} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${variants[variant]} ${block ? 'w-full' : ''} ${className}`}
       {...rest}
     />
   );
@@ -41,7 +41,7 @@ export function IconButton({
       type={type}
       aria-label={label}
       title={label}
-      className={`inline-flex size-12 shrink-0 items-center justify-center rounded-xl text-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${variants[variant]} ${className}`}
+      className={`inline-flex size-12 shrink-0 items-center justify-center rounded-2xl text-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${variants[variant]} ${className}`}
       {...rest}
     >
       <span aria-hidden="true">{children}</span>

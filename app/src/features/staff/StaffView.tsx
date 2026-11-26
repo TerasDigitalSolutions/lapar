@@ -37,7 +37,7 @@ export function StaffView({ shopId }: { shopId: string }) {
   const choose = (id: TabId) => (setTab(id), writeJson(TAB_KEY, id));
 
   return (
-    <div className="flex min-h-full flex-col bg-stone-50">
+    <div className="flex min-h-full flex-col bg-stone-50 [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10">
       {!soundOn && (
         <Banner kind="warn" action={<Button onClick={() => void enable()}>{t('enable_sound_btn')}</Button>}>
           {t('enable_sound')}

@@ -252,7 +252,7 @@ export function TablesTab({ shopId }: { shopId: string }) {
                   {tab.pickupAt && <span className="text-sm text-stone-700">{t('pickup_time', { time: hhmm(tab.pickupAt) })}</span>}
                   <span className="text-xl font-bold text-stone-900">{formatRM(tab.remainingSen)}</span>
                   {tab.pendingOrders > 0 && <span className="text-sm font-semibold text-orange-700">{t('tab_pending', { n: tab.pendingOrders })}</span>}
-                  {tab.readyLines > 0 && <span className="text-sm font-semibold text-emerald-700">{t('tab_ready', { n: tab.readyLines })}</span>}
+                  {tab.readyLines > 0 && <span className="text-sm font-semibold text-green-700">{t('tab_ready', { n: tab.readyLines })}</span>}
                 </>
               ) : (
                 <span className="text-stone-500">{t('table_free')}</span>
@@ -260,7 +260,7 @@ export function TablesTab({ shopId }: { shopId: string }) {
               {table.openRequests > 0 && <span className="text-sm font-semibold text-red-700">{t('tab_calls', { n: table.openRequests })}</span>}
             </>
           );
-          const cls = 'flex min-h-24 flex-col items-start gap-1 rounded-2xl border-2 p-3 text-left';
+          const cls = 'flex min-h-24 flex-col items-start gap-1 rounded-2xl border-2 p-3 text-left shadow-sm';
           return (
             <li key={key}>
               {tab ? (

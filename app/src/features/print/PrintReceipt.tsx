@@ -69,7 +69,7 @@ function Bill({ slip, t }: { slip: BillSlip; t: T }) {
 
 function Slips({ slips, t }: { slips: Slip[]; t: T }) {
   return slips.map((s, i) => (
-    <div key={i} className="slip mb-3 w-[58mm] bg-white p-[3mm] text-black shadow">
+    <div key={i} className="slip mb-3 w-[58mm] bg-[#fff] p-[3mm] text-black shadow">
       {s.kind === 'ticket' ? <Ticket slip={s} t={t} /> : <Bill slip={s} t={t} />}
     </div>
   ));

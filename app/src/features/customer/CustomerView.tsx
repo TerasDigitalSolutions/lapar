@@ -6,9 +6,10 @@ import { getLocale, setLocale, type Locale } from '../../i18n';
 import { formatRM } from '../../lib/money';
 import { pickSuggestions } from '../../lib/suggestions';
 import { Button, EmptyState, ErrorState, Loading, PhotoTile, Segmented, TabBar } from '../../ui';
-import { addLine, loadCart, loadCounterTabs, loadTabId, markSeen, saveCart, saveCounterTab, saveTabId, seenSet, tr, unitSen, type CartLine } from './cart';
+import { addLine, loadCart, loadCounterTabs, loadTabId, markSeen, saveCart, saveCounterTab, saveTabId, seenSet, tr, trDesc, unitSen, type CartLine } from './cart';
 import { useT } from './messages';
 import { CallPanel, CounterOrders, LiveSync, StatusPanel } from './panels';
+import { CategoryNav } from './CategoryNav';
 import { CartSheet, ItemPrice, ItemSheet, PickSheet } from './sheets';
 
 type Sheet = { k: 'item'; item: MenuItem; from: Uuid | null; ret: 'suggest' | 'cart' } | { k: 'suggest'; source: MenuItem; items: MenuItem[] } | { k: 'nudge'; items: MenuItem[] } | { k: 'cart' } | null;
@@ -161,16 +162,18 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
   ];
 
   return (
-    <div className="mx-auto min-h-dvh max-w-xl bg-stone-50 pb-28">
+    <div className="mx-auto min-h-dvh max-w-xl bg-stone-50 pb-32">
       {live && <LiveSync shopId={menu.shop.id} load={() => Promise.all([loadMenu(), loadTab()])} />}
-      <header className="flex items-center gap-3 bg-white p-4">
-        {menu.shop.logoUrl && <PhotoTile url={menu.shop.logoUrl} name={menu.shop.name} className="size-12" />}
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold">{menu.shop.name}</h1>
-          <p className="text-stone-700">{takeaway ? t('takeaway') : menu.table.label}</p>
+      <header className="rounded-b-3xl bg-orange-600 px-4 pt-5 pb-4 text-white shadow-md">
+        <div className="flex items-center gap-3">
+          {menu.shop.logoUrl && <PhotoTile url={menu.shop.logoUrl} name={menu.shop.name} className="size-14 rounded-2xl ring-2 ring-white/70" />}
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-extrabold tracking-tight">{menu.shop.name}</h1>
+            <p className="mt-1 inline-block rounded-full bg-white/25 px-3 py-0.5 text-sm font-semibold">{takeaway ? t('takeaway') : menu.table.label}</p>
+          </div>
         </div>
         {menu.features.multi_language_menu && (
-          <div className="ml-auto w-52 shrink-0">
+          <div className="mt-3">
             <Segmented<Locale>
               label={t('language')}
               value={getLocale()}
@@ -184,7 +187,7 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
           </div>
         )}
       </header>
-      {takeaway && panel === 'menu' && <p className="bg-orange-50 px-4 py-2 font-semibold text-orange-900">{t('takeaway_body')}</p>}
+      {takeaway && panel === 'menu' && <p className="bg-orange-100 px-4 py-2 font-semibold text-orange-900">{t('takeaway_body')}</p>}
       <TabBar tabs={tabs} value={panel} onChange={setPanel} />
 
       {panel === 'menu' && (
@@ -193,40 +196,42 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
             <EmptyState title={t('empty_menu')} />
           ) : (
             <>
-              <nav aria-label={t('categories')} className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-stone-200 bg-white px-4 py-2">
-                {sections.map(({ c }) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="min-h-12 shrink-0 rounded-full bg-stone-100 px-5 font-semibold text-stone-900 active:bg-orange-100"
-                    onClick={() => document.getElementById(`cat-${c.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}
-                  >
-                    {tr(c.name, c.translations)}
-                  </button>
-                ))}
-              </nav>
+              <CategoryNav label={t('categories')} cats={sections.map(({ c }) => ({ id: c.id, name: tr(c.name, c.translations) }))} />
               {sections.map(({ c, items }) => (
                 <section key={c.id} id={`cat-${c.id}`} aria-label={tr(c.name, c.translations)} className="scroll-mt-16 px-4 pt-4">
-                  <h2 className="mb-2 text-lg font-bold">{tr(c.name, c.translations)}</h2>
-                  <ul className="flex flex-col gap-2">
+                  <h2 className="mb-3 flex items-center gap-2 text-xl font-extrabold text-stone-900">
+                    <span aria-hidden="true" className="h-6 w-1.5 rounded-full bg-orange-600" />
+                    {tr(c.name, c.translations)}
+                  </h2>
+                  <ul className="flex flex-col gap-3">
                     {items.map((i) => (
                       <li key={i.id}>
                         <button
                           type="button"
                           disabled={!orderable(i)}
+                          aria-describedby={i.description ? `desc-${i.id}` : undefined}
                           onClick={() => open(i)}
-                          className={`flex min-h-24 w-full items-center gap-3 rounded-xl border border-stone-200 bg-white p-2 text-left ${orderable(i) ? 'active:bg-orange-50' : 'opacity-50'}`}
+                          className={`flex min-h-28 w-full items-stretch gap-3 rounded-2xl border border-stone-200 p-2.5 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 ${orderable(i) ? 'bg-white active:bg-orange-50 active:shadow-none' : 'bg-stone-100'}`}
                         >
-                          <PhotoTile url={i.photoUrl} name={i.name} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block font-semibold">{tr(i.name, i.translations)}</span>
-                            {!orderable(i) && (
-                              <span className="block text-sm font-medium text-stone-700">
-                                {i.soldOut ? t('sold_out') : windowOf(i) ? t('available_window', { from: windowOf(i)!.from, to: windowOf(i)!.to }) : t('not_now')}
-                              </span>
-                            )}
+                          <span className={`shrink-0 ${orderable(i) ? '' : 'opacity-60 grayscale'}`}>
+                            <PhotoTile url={i.photoUrl} name={i.name} className="size-28 rounded-xl" />
                           </span>
-                          <ItemPrice item={i} />
+                          <span className={`flex min-w-0 flex-1 flex-col justify-between gap-1 ${orderable(i) ? '' : 'opacity-70'}`}>
+                            <span className="block">
+                              <span className="block text-lg leading-snug font-bold text-stone-900">{tr(i.name, i.translations)}</span>
+                              {!orderable(i) && (
+                                <span className="mt-1 inline-block rounded-full bg-stone-200 px-2.5 py-0.5 text-sm font-semibold text-stone-800">
+                                  {i.soldOut ? t('sold_out') : windowOf(i) ? t('available_window', { from: windowOf(i)!.from, to: windowOf(i)!.to }) : t('not_now')}
+                                </span>
+                              )}
+                              {i.description && (
+                                <span id={`desc-${i.id}`} aria-hidden="true" className="mt-1 line-clamp-2 block text-sm text-stone-600">
+                                  {trDesc(i)}
+                                </span>
+                              )}
+                            </span>
+                            <ItemPrice item={i} />
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -250,11 +255,12 @@ export function CustomerView({ tableToken, live = false }: { tableToken: string;
 
       {panel === 'menu' && cartCount > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <Button block className="min-h-14 justify-between text-lg shadow-lg" onClick={() => (setPlaceError(null), setSheet({ k: 'cart' }))}>
-            <span>
-              {t('view_order')} · {cartCount}
+          <Button block className="min-h-14 justify-between rounded-2xl text-lg shadow-xl ring-4 ring-stone-50" onClick={() => (setPlaceError(null), setSheet({ k: 'cart' }))}>
+            <span className="flex items-center gap-3">
+              <span className="min-w-8 rounded-full bg-white px-2 py-0.5 text-center text-base font-extrabold text-orange-700">{cartCount}</span>
+              <span>{t('view_order')}</span>
             </span>
-            <span>{formatRM(cartTotal)}</span>
+            <span className="font-extrabold">{formatRM(cartTotal)}</span>
           </Button>
         </div>
       )}

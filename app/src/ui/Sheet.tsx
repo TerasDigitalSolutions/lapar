@@ -47,16 +47,17 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-[90%] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-xl sm:rounded-3xl"
+        className="relative flex max-h-[90%] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
       >
+        <div aria-hidden="true" className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-stone-300 sm:hidden" />
         <div className="flex items-center justify-between gap-2 border-b border-stone-200 py-2 pr-2 pl-5">
-          <h2 id={titleId} className="text-lg font-bold text-stone-900">
+          <h2 id={titleId} className="text-xl font-extrabold text-stone-900">
             {title}
           </h2>
           <IconButton label={t('close')} onClick={onClose}>

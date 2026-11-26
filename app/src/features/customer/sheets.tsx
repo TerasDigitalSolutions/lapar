@@ -5,13 +5,13 @@ import { Banner, Button, Field, PhotoTile, QtyStepper, Sheet, inputClass } from 
 import { optionNames, pickupSlots, hhmm, tr, trDesc, unitSen, type CartLine } from './cart';
 import { useT } from './messages';
 
-const rowBtn = 'flex min-h-12 w-full items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 text-left';
+const rowBtn = 'flex min-h-12 w-full items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3 text-left shadow-sm';
 
 export function ItemPrice({ item }: { item: MenuItem }) {
   const t = useT();
   return (
     <span className="flex flex-col">
-      <span className="font-bold text-stone-900">{formatRM(item.effectivePriceSen)}</span>
+      <span className="text-xl leading-tight font-extrabold text-orange-700">{formatRM(item.effectivePriceSen)}</span>
       {item.effectivePriceSen < item.priceSen && <span className="text-sm text-stone-500 line-through">{t('was', { price: formatRM(item.priceSen) })}</span>}
       {item.promo && <span className="text-sm font-semibold text-orange-800">{tr(item.promo.name, item.promo.translations)}</span>}
     </span>
@@ -31,6 +31,7 @@ export function ItemSheet({ item, from, onAdd, onClose }: { item: MenuItem; from
   return (
     <Sheet open onClose={onClose} title={tr(item.name, item.translations)}>
       <div className="flex flex-col gap-5">
+        {item.photoUrl && <PhotoTile url={item.photoUrl} name={item.name} className="-mt-1 h-52 w-full rounded-2xl" />}
         {item.description && <p className="text-stone-700">{trDesc(item)}</p>}
         {item.combo && <p className="text-stone-700">{t('set_includes', { items: item.combo.components.map((c) => `${c.qty} x ${tr(c.name, c.translations)}`).join(', ') })}</p>}
         {item.promo && (
@@ -74,9 +75,9 @@ export function ItemSheet({ item, from, onAdd, onClose }: { item: MenuItem; from
         <Field label={t('note')} hint={t('note_count', { n: note.length })}>
           {(p) => <textarea {...p} className={inputClass} rows={2} maxLength={140} placeholder={t('note_hint')} value={note} onChange={(e) => setNote(e.target.value)} />}
         </Field>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-2xl bg-stone-100 p-3">
           <QtyStepper value={qty} min={1} onChange={setQty} />
-          <span className="text-xl font-bold">{formatRM(qty * unitSen(item, optionIds))}</span>
+          <span className="text-2xl font-extrabold text-orange-700">{formatRM(qty * unitSen(item, optionIds))}</span>
         </div>
         {missing.length > 0 && <p className="text-sm font-medium text-orange-800">{t('pick_required', { groups: missing.map((g) => tr(g.name, g.translations)).join(', ') })}</p>}
         <Button block disabled={missing.length > 0} onClick={() => onAdd({ itemId: item.id, qty, optionIds, note: note.trim(), from })}>
@@ -168,7 +169,7 @@ export function CartSheet({
             const item = byId.get(l.itemId)!;
             const opts = optionNames(item, l.optionIds);
             return (
-              <li key={i} className="flex flex-col gap-2 rounded-xl border border-stone-200 p-3">
+              <li key={i} className="flex flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
                 <div className="flex justify-between gap-3">
                   <span className="font-semibold">{tr(item.name, item.translations)}</span>
                   <span className="font-bold">{formatRM(l.qty * unitSen(item, l.optionIds))}</span>
@@ -199,7 +200,7 @@ export function CartSheet({
             )}
           </Field>
         )}
-        <div className="flex items-baseline justify-between text-xl font-bold">
+        <div className="flex items-baseline justify-between rounded-2xl bg-orange-50 px-4 py-3 text-xl font-extrabold text-orange-900">
           <span>{t('total')}</span>
           <span>{formatRM(total)}</span>
         </div>

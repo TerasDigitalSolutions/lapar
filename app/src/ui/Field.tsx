@@ -2,7 +2,7 @@ import { useId, type ReactNode } from 'react';
 
 /** Class for text inputs, textareas and selects inside a Field. */
 export const inputClass =
-  'block min-h-12 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base text-stone-900 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-orange-600 aria-[invalid=true]:border-red-600 disabled:bg-stone-100';
+  'block min-h-12 w-full rounded-xl border border-stone-400 bg-white px-4 py-3 text-base text-stone-900 placeholder:text-stone-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-orange-600 aria-[invalid=true]:border-red-600 disabled:bg-stone-100';
 
 export interface FieldControlProps {
   id: string;

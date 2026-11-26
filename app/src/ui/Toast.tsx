@@ -37,7 +37,7 @@ export function ToastProvider({ children, durationMs = 4000 }: { children: React
         className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex flex-col items-center gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:top-auto sm:bottom-0 sm:pt-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
       >
         {items.map((i) => (
-          <div key={i.id} className={`pointer-events-auto w-full max-w-md rounded-xl px-4 py-3 text-base font-medium shadow-lg ${tone[i.kind]}`}>
+          <div key={i.id} className={`pointer-events-auto w-full max-w-md rounded-2xl px-4 py-3.5 text-base font-semibold shadow-xl ${tone[i.kind]}`}>
             {i.message}
           </div>
         ))}

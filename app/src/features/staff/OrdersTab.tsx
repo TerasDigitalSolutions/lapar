@@ -113,7 +113,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
         {pending.length === 0 && <p className="text-stone-600">{t('no_approvals')}</p>}
         <ul className="flex flex-col gap-3">
           {pending.map((o) => (
-            <li key={o.orderId} data-testid="pending-order" className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-4">
+            <li key={o.orderId} data-testid="pending-order" className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-4 shadow-sm">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xl font-bold text-stone-900">{place(o)}</span>
                 <Waiting since={o.createdAt} now={now} />
@@ -141,7 +141,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
         {calls.length === 0 && <p className="text-stone-600">{t('no_calls')}</p>}
         <ul className="flex flex-col gap-3">
           {calls.map((c) => (
-            <li key={c.id} className={`rounded-2xl border-2 p-4 ${c.status === 'open' ? 'border-red-300 bg-red-50' : 'border-stone-200 bg-white'}`}>
+            <li key={c.id} className={`rounded-2xl border-2 p-4 shadow-sm ${c.status === 'open' ? 'border-red-300 bg-red-50' : 'border-stone-200 bg-white'}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xl font-bold text-stone-900">{c.tableLabel}: {t(CALL_KEY[c.reason])}</span>
                 <Waiting since={c.createdAt} now={now} />
@@ -170,7 +170,7 @@ export function OrdersTab({ shopId, pending, calls, reload }: { shopId: string; 
           {[...grouped.values()].map((lines) => {
             const first = lines[0]!;
             return (
-              <li key={first.orderId} className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+              <li key={first.orderId} className="rounded-2xl border-2 border-green-300 bg-green-50 p-4 shadow-sm">
                 <span className="text-xl font-bold text-stone-900">{place(first)}</span>
                 <ul className="mt-2 flex flex-col gap-2">
                   {lines.map((l) => (

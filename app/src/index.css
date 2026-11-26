@@ -1,1 +1,167 @@
 @import 'tailwindcss';
+
+/*
+ * Colour themes. Components only use the `orange` (accent), `stone` (neutral), `white` (surface),
+ * `red`/`green`/`amber`/`sky` (status) scales, so a theme is just a different set of values for those variables.
+ * Theme = `data-theme` on <html> (set by lib/theme.ts); no attribute = kopitiam.
+ * Rules of thumb used by every palette: 600 is the accent fill for white (or `--color-white`) text; 700-900 are accent text on 50-100.
+ */
+
+:root,
+[data-theme='kopitiam'] {
+  color-scheme: light;
+  --color-white: #fffdf8;
+  --color-stone-50: #faf4e6;
+  --color-stone-100: #f1e8d3;
+  --color-stone-200: #e3d6bb;
+  --color-stone-300: #cbbb9a;
+  --color-stone-400: #9a8a6c;
+  --color-stone-500: #7b6c52;
+  --color-stone-600: #5f523c;
+  --color-stone-700: #4a3f2d;
+  --color-stone-800: #352d1f;
+  --color-stone-900: #261f15;
+  --color-stone-950: #17120b;
+  --color-orange-50: #fff4e8;
+  --color-orange-100: #ffe3c6;
+  --color-orange-200: #fbc690;
+  --color-orange-300: #f6a257;
+  --color-orange-400: #ee7d2b;
+  --color-orange-500: #d9601a;
+  --color-orange-600: #c2410c;
+  --color-orange-700: #9a3412;
+  --color-orange-800: #7c2d12;
+  --color-orange-900: #5f230f;
+  --color-orange-950: #3a1407;
+}
+
+[data-theme='pandan'] {
+  color-scheme: light;
+  --color-white: #fcfffb;
+  --color-stone-50: #f1f7ef;
+  --color-stone-100: #e4eee1;
+  --color-stone-200: #cfdecb;
+  --color-stone-300: #b0c4ab;
+  --color-stone-400: #7f9479;
+  --color-stone-500: #627860;
+  --color-stone-600: #4c6049;
+  --color-stone-700: #3b4c39;
+  --color-stone-800: #2a382a;
+  --color-stone-900: #1b261b;
+  --color-stone-950: #0f160f;
+  --color-orange-50: #ecf8e9;
+  --color-orange-100: #d6efd0;
+  --color-orange-200: #b3e0a9;
+  --color-orange-300: #86cb7b;
+  --color-orange-400: #55ad52;
+  --color-orange-500: #3a9142;
+  --color-orange-600: #2a7a38;
+  --color-orange-700: #20622e;
+  --color-orange-800: #1a4e26;
+  --color-orange-900: #143d1f;
+  --color-orange-950: #0a2411;
+}
+
+[data-theme='teh-tarik'] {
+  color-scheme: light;
+  --color-white: #fffcf9;
+  --color-stone-50: #f6ece4;
+  --color-stone-100: #ecdcce;
+  --color-stone-200: #dcc6b3;
+  --color-stone-300: #c4a78e;
+  --color-stone-400: #957859;
+  --color-stone-500: #765d44;
+  --color-stone-600: #5d4733;
+  --color-stone-700: #4a3727;
+  --color-stone-800: #36281c;
+  --color-stone-900: #261b12;
+  --color-stone-950: #150f09;
+  --color-orange-50: #fbf3df;
+  --color-orange-100: #f6e5b8;
+  --color-orange-200: #edd088;
+  --color-orange-300: #e0b657;
+  --color-orange-400: #cf9a33;
+  --color-orange-500: #b07a22;
+  --color-orange-600: #8a5a1c;
+  --color-orange-700: #6f4616;
+  --color-orange-800: #583612;
+  --color-orange-900: #42280d;
+  --color-orange-950: #281607;
+}
+
+/* Dark: scales run backwards (50 = darkest, 950 = lightest) so `bg-stone-50 text-stone-900` flips on its own. */
+[data-theme='malam'] {
+  color-scheme: dark;
+  --color-white: #1f1f23;
+  --color-stone-50: #0f0f12;
+  --color-stone-100: #19191d;
+  --color-stone-200: #2a2a30;
+  --color-stone-300: #3f3f47;
+  --color-stone-400: #8a8a95;
+  --color-stone-500: #9d9da8;
+  --color-stone-600: #b4b4be;
+  --color-stone-700: #cbcbd3;
+  --color-stone-800: #dedee4;
+  --color-stone-900: #efeff3;
+  --color-stone-950: #fafafc;
+  --color-orange-50: #2a1f0b;
+  --color-orange-100: #3b2b0d;
+  --color-orange-200: #5a4210;
+  --color-orange-300: #86620f;
+  --color-orange-400: #c9921a;
+  --color-orange-500: #f0a921;
+  --color-orange-600: #fbbf24;
+  --color-orange-700: #fcd34d;
+  --color-orange-800: #fde68a;
+  --color-orange-900: #fef0b5;
+  --color-orange-950: #fff8dc;
+  --color-red-50: #34161a;
+  --color-red-100: #4a1c21;
+  --color-red-200: #6e272e;
+  --color-red-300: #9b3a42;
+  --color-red-400: #e5686f;
+  --color-red-500: #f27d82;
+  --color-red-600: #f78e92;
+  --color-red-700: #fba7aa;
+  --color-red-800: #fdc2c4;
+  --color-red-900: #fedcdd;
+  --color-red-950: #fff0f0;
+  --color-green-50: #0f2a1b;
+  --color-green-100: #153a25;
+  --color-green-200: #1f5535;
+  --color-green-300: #2d7a4c;
+  --color-green-400: #44b772;
+  --color-green-500: #55cc84;
+  --color-green-600: #6ddb98;
+  --color-green-700: #8de8b0;
+  --color-green-800: #b2f0c9;
+  --color-green-900: #d3f7e1;
+  --color-green-950: #ecfcf2;
+  --color-amber-50: #2e2209;
+  --color-amber-100: #44320c;
+  --color-amber-200: #66490f;
+  --color-amber-300: #7d5a10;
+  --color-amber-400: #d6a21c;
+  --color-amber-500: #f0b92a;
+  --color-amber-600: #f6c64f;
+  --color-amber-700: #f9d77b;
+  --color-amber-800: #fbe4a2;
+  --color-amber-900: #fdefc4;
+  --color-amber-950: #fff9e6;
+  --color-sky-50: #0e2433;
+  --color-sky-100: #133349;
+  --color-sky-200: #1c4d6c;
+  --color-sky-300: #2b6f98;
+  --color-sky-400: #4bb0e6;
+  --color-sky-500: #62bdee;
+  --color-sky-600: #7cc9f2;
+  --color-sky-700: #9cd7f6;
+  --color-sky-800: #bde5fa;
+  --color-sky-900: #d6eefc;
+  --color-sky-950: #eef8fe;
+}
+
+body {
+  background-color: var(--color-stone-50);
+  color: var(--color-stone-900);
+}

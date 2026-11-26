@@ -11,7 +11,7 @@ export interface TabItem<Id extends string> {
 /** Tab strip. Give each panel `role="tabpanel"` and `id={`panel-${id}`}`; tabs have `id={`tab-${id}`}`. */
 export function TabBar<Id extends string>({ tabs, value, onChange, label }: { tabs: readonly TabItem<Id>[]; value: Id; onChange: (id: Id) => void; label?: string }) {
   return (
-    <div role="tablist" aria-label={label} className="flex border-b border-stone-200 bg-white">
+    <div role="tablist" aria-label={label} className="flex border-b border-stone-200 bg-white px-2 shadow-sm">
       {tabs.map((tab) => {
         const selected = tab.id === value;
         return (

@@ -35,9 +35,9 @@ function PinGate() {
   if (!session) return <StaffPinForm onSubmit={async (code, pin) => setSession(await auth.claimStaffSession(code, pin))} />;
   return (
     <>
-      <div className="flex items-center justify-between gap-2 border-b border-stone-200 bg-white px-4 py-1">
-        <span className="truncate text-sm text-stone-700">{t('staff_signed_in_as', { name: session.staffName })}</span>
-        <Button variant="ghost" onClick={() => void auth.endStaffSession().then(() => setSession(null), () => setSession(null))}>
+      <div className="flex items-center justify-between gap-2 border-b border-orange-700 bg-orange-600 px-4 py-1 text-white">
+        <span className="truncate text-sm font-semibold">{t('staff_signed_in_as', { name: session.staffName })}</span>
+        <Button variant="ghost" className="text-inherit hover:bg-white/20 active:bg-white/30" onClick={() => void auth.endStaffSession().then(() => setSession(null), () => setSession(null))}>
           {t('sign_out')}
         </Button>
       </div>

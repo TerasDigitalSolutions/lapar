@@ -42,7 +42,7 @@ export function PickupBoardView({ boardToken }: { boardToken: string }) {
   }
 
   const column = (id: 'preparing' | 'ready', numbers: number[], tone: string) => (
-    <section aria-labelledby={`pb-${id}`} className={`flex flex-1 flex-col rounded-3xl p-6 ${tone}`}>
+    <section aria-labelledby={`pb-${id}`} className={`flex flex-1 flex-col rounded-3xl p-6 shadow-md ${tone}`}>
       <h2 id={`pb-${id}`} className="mb-4 text-center text-4xl font-black uppercase tracking-wide md:text-6xl">
         {t(id)}
       </h2>
@@ -51,7 +51,7 @@ export function PickupBoardView({ boardToken }: { boardToken: string }) {
       ) : (
         <ul aria-labelledby={`pb-${id}`} className="grid grid-cols-2 content-start gap-4 text-center">
           {numbers.map((n) => (
-            <li key={n} className="text-7xl font-black tabular-nums leading-tight md:text-9xl">
+            <li key={n} className="rounded-2xl bg-white/70 text-7xl font-black tabular-nums leading-tight shadow-sm md:text-9xl">
               {n}
             </li>
           ))}
@@ -61,9 +61,9 @@ export function PickupBoardView({ boardToken }: { boardToken: string }) {
   );
 
   return (
-    <main data-board-token={boardToken} className="flex min-h-dvh flex-col gap-4 bg-white p-4 text-stone-900">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold md:text-5xl">{board.shopName}</h1>
+    <main data-board-token={boardToken} className="flex min-h-dvh flex-col gap-4 bg-stone-50 p-4 text-stone-900">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-orange-600 px-6 py-4 text-white shadow-md">
+        <h1 className="text-3xl font-extrabold md:text-5xl">{board.shopName}</h1>
         <div className="flex items-center gap-3">
           <div className="w-44">
             <Segmented<Locale>
